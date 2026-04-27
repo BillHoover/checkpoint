@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Local test/build artifacts
+*.log
+node_modules/
+
+# Local CSV exports if anyone tests in the repo dir
+checkpoint-*.csv
