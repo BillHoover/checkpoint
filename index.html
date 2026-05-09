@@ -504,7 +504,6 @@ const PRESS_MOVE_THRESHOLD_SQ = 100; // (10px)^2 — beyond this, treat press as
 const $ = id => document.getElementById(id);
 const showModal = id => $(id).classList.add('show');
 const hideModal = id => $(id).classList.remove('show');
-const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
 
 // ============ PERSISTENCE ============
 function loadRiders() {
@@ -683,16 +682,16 @@ function commitEdit(parsed) {
   render();
 }
 
-on('timeCancel', 'click', closeTimeModal);
-on('timeSave', 'click', () => {
+$('timeCancel').addEventListener('click', closeTimeModal);
+$('timeSave').addEventListener('click', () => {
   const val = $('timeInput').value.trim();
   if (!val)            { toast('To clear, use the Clear button'); return; }
   const parsed = parseTime(val);
   if (!parsed)         { toast('Invalid time format'); return; }
   commitEdit(parsed);
 });
-on('timeClear',  'click', () => commitEdit(''));
-on('timeInput',  'keydown', e => {
+$('timeClear').addEventListener('click', () => commitEdit(''));
+$('timeInput').addEventListener('keydown', e => {
   if (e.key === 'Enter')  $('timeSave').click();
   if (e.key === 'Escape') closeTimeModal();
 });
@@ -716,11 +715,11 @@ function addRosterRow(num, name) {
   $('rosterList').appendChild(row);
 }
 
-on('setupBtn',     'click', openRosterModal);
-on('setupBtn2',    'click', openRosterModal);
-on('rosterCancel', 'click', closeRosterModal);
+$('setupBtn').addEventListener('click', openRosterModal);
+$('setupBtn2').addEventListener('click', openRosterModal);
+$('rosterCancel').addEventListener('click', closeRosterModal);
 
-on('rosterAdd', 'click', () => {
+$('rosterAdd').addEventListener('click', () => {
   // Suggest next sequential number
   const nums = Array.from($('rosterList').querySelectorAll('input.num'))
     .map(i => parseInt(i.value, 10))
@@ -729,7 +728,7 @@ on('rosterAdd', 'click', () => {
   addRosterRow(next, '');
 });
 
-on('rosterClear', 'click', () => {
+$('rosterClear').addEventListener('click', () => {
   if (!confirm('Clear all riders AND all recorded times? This cannot be undone.')) return;
   riders = [];
   saveRiders();
@@ -737,7 +736,7 @@ on('rosterClear', 'click', () => {
   render();
 });
 
-on('rosterSave', 'click', () => {
+$('rosterSave').addEventListener('click', () => {
   const rows = document.querySelectorAll('#rosterList .roster-row');
   const newRoster = [];
   const seenNums = new Set();
@@ -787,9 +786,9 @@ function parseCSVLine(line) {
   return out;
 }
 
-on('rosterImport', 'click', () => $('rosterFile').click());
+$('rosterImport').addEventListener('click', () => $('rosterFile').click());
 
-on('rosterFile', 'change', e => {
+$('rosterFile').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -983,12 +982,12 @@ function triggerDownload(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
-on('exportBtn',    'click', openExportMenu);
-on('exportCancel', 'click', closeExportModal);
-on('expSave',      'click', saveCSVFile);
-on('expGmail',     'click', emailViaGmail);
-on('expSheets',    'click', syncToSheet);
-on('expShare',     'click', shareViaSystem);
+$('exportBtn').addEventListener('click', openExportMenu);
+$('exportCancel').addEventListener('click', closeExportModal);
+$('expSave').addEventListener('click', saveCSVFile);
+$('expGmail').addEventListener('click', emailViaGmail);
+$('expSheets').addEventListener('click', syncToSheet);
+$('expShare').addEventListener('click', shareViaSystem);
 
 // ============ SETTINGS ============
 const APPS_SCRIPT_URL_RE = /^https:\/\/script\.google\.com\//;
@@ -1037,12 +1036,12 @@ async function testSheetUrl() {
   }
 }
 
-on('exportSettingsBtn', 'click', openSettings);
-on('settingsCancel',    'click', () => hideModal('settingsModal'));
-on('settingsSave',      'click', saveSettingsFromForm);
-on('settingsTest',      'click', testSheetUrl);
-on('howtoLink',  'click', e => { e.preventDefault(); showModal('howtoModal'); });
-on('howtoClose', 'click', () => hideModal('howtoModal'));
+$('exportSettingsBtn').addEventListener('click', openSettings);
+$('settingsCancel').addEventListener('click', () => hideModal('settingsModal'));
+$('settingsSave').addEventListener('click', saveSettingsFromForm);
+$('settingsTest').addEventListener('click', testSheetUrl);
+$('howtoLink').addEventListener('click', e => { e.preventDefault(); showModal('howtoModal'); });
+$('howtoClose').addEventListener('click', () => hideModal('howtoModal'));
 
 // ============ TOAST ============
 let toastTimer = null;
