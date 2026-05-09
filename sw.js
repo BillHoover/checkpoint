@@ -1,5 +1,5 @@
 // Checkpoint - offline service worker
-const CACHE = 'checkpoint-v1';
+const CACHE = 'checkpoint-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -38,7 +38,12 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return resp;
-      }).catch(() => caches.match('./index.html'));
+      }).catch(err => {
+        // Only fall back to the app shell for navigations. Returning index.html
+        // for failed image / asset requests would serve HTML with the wrong MIME.
+        if (e.request.mode === 'navigate') return caches.match('./index.html');
+        throw err;
+      });
     })
   );
 });

@@ -261,11 +261,13 @@
     cursor: not-allowed;
   }
   .export-opt .opt-title {
+    display: block;
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 2px;
   }
   .export-opt .opt-sub {
+    display: block;
     font-size: 11px;
     color: var(--text-dim);
     font-weight: 400;
@@ -399,20 +401,20 @@
     <div class="hint" id="exportSummary" style="margin-bottom: 14px;"></div>
     <div class="export-options">
       <button class="export-opt" id="expSave">
-        <div class="opt-title">💾 Save CSV file</div>
-        <div class="opt-sub">Download to this device</div>
+        <span class="opt-title">💾 Save CSV file</span>
+        <span class="opt-sub">Download to this device</span>
       </button>
       <button class="export-opt" id="expGmail">
-        <div class="opt-title">✉️ Email via Gmail</div>
-        <div class="opt-sub">Opens Gmail compose with CSV pasted in</div>
+        <span class="opt-title">✉️ Email via Gmail</span>
+        <span class="opt-sub">Opens Gmail compose with CSV pasted in</span>
       </button>
       <button class="export-opt" id="expSheets">
-        <div class="opt-title">📊 Send to Google Sheet</div>
-        <div class="opt-sub" id="expSheetsSub">Configure URL in Settings first</div>
+        <span class="opt-title">📊 Send to Google Sheet</span>
+        <span class="opt-sub" id="expSheetsSub">Configure URL in Settings first</span>
       </button>
       <button class="export-opt" id="expShare" style="display:none;">
-        <div class="opt-title">📤 Share…</div>
-        <div class="opt-sub">System share sheet</div>
+        <span class="opt-title">📤 Share…</span>
+        <span class="opt-sub">System share sheet</span>
       </button>
     </div>
     <div class="modal-actions">
@@ -496,8 +498,7 @@
 const STORAGE_KEY = 'checkpoint.riders.v1';
 let riders = []; // [{ num, name, arrival, departure }]
 let editing = null; // { riderNum, field }
-let pressTimer = null;
-let pressTriggeredLong = false;
+const PRESS_MOVE_THRESHOLD_SQ = 100; // (10px)^2 — beyond this, treat press as a scroll/drag
 
 // ============ PERSISTENCE ============
 function loadRiders() {
@@ -521,8 +522,10 @@ function tickClock() {
   const d = new Date();
   document.getElementById('clock').textContent =
     pad(d.getHours()) + ':' + pad(d.getMinutes());
+  // Reschedule on the next minute boundary instead of ticking once per second.
+  const msToNextMinute = 60000 - (d.getSeconds() * 1000 + d.getMilliseconds());
+  setTimeout(tickClock, msToNextMinute + 50);
 }
-setInterval(tickClock, 1000);
 tickClock();
 
 // Parse user-entered time. Accepts: HH:MM, HMM, HHMM. Always returns HH:MM.
@@ -585,37 +588,54 @@ function escapeHTML(s) {
 }
 
 // ============ CELL INTERACTION ============
+// Press state is stored on the cell itself (cell._press) so concurrent touches
+// on different cells don't clobber each other. pointerleave is intentionally NOT
+// used to cancel — it fires on minor finger drift (especially with gloves) and
+// would defeat long-press. Movement past PRESS_MOVE_THRESHOLD cancels instead.
 function attachTimeHandlers() {
   document.querySelectorAll('.time-cell').forEach(cell => {
-    // Pointer-based unified handlers (mouse + touch + pen)
     cell.addEventListener('pointerdown', onPressStart);
     cell.addEventListener('pointerup', onPressEnd);
-    cell.addEventListener('pointerleave', onPressCancel);
+    cell.addEventListener('pointermove', onPressMove);
     cell.addEventListener('pointercancel', onPressCancel);
-    // Block context menu (long-press on mobile triggers it otherwise)
     cell.addEventListener('contextmenu', e => e.preventDefault());
   });
 }
 
 function onPressStart(e) {
-  pressTriggeredLong = false;
   const cell = e.currentTarget;
-  pressTimer = setTimeout(() => {
-    pressTriggeredLong = true;
+  cell._press = { startX: e.clientX, startY: e.clientY, triggered: false, timer: 0 };
+  cell._press.timer = setTimeout(() => {
+    cell._press.triggered = true;
     openTimeModal(cell);
   }, 550);
 }
+function onPressMove(e) {
+  const p = e.currentTarget._press;
+  if (!p) return;
+  const dx = e.clientX - p.startX;
+  const dy = e.clientY - p.startY;
+  if (dx * dx + dy * dy > PRESS_MOVE_THRESHOLD_SQ) {
+    clearTimeout(p.timer);
+    e.currentTarget._press = null;
+  }
+}
 function onPressEnd(e) {
-  clearTimeout(pressTimer);
-  if (pressTriggeredLong) return;
   const cell = e.currentTarget;
+  const p = cell._press;
+  if (!p) return;
+  clearTimeout(p.timer);
+  const wasLong = p.triggered;
+  cell._press = null;
+  if (wasLong) return;
   // Only quick-tap to record on EMPTY cells. Filled cells require long-press to edit
   // (prevents accidentally overwriting a recorded time).
   if (!cell.classList.contains('empty')) return;
   recordCurrentTime(cell);
 }
-function onPressCancel() {
-  clearTimeout(pressTimer);
+function onPressCancel(e) {
+  const cell = e.currentTarget;
+  if (cell._press) { clearTimeout(cell._press.timer); cell._press = null; }
 }
 
 function recordCurrentTime(cell) {
@@ -625,9 +645,13 @@ function recordCurrentTime(cell) {
   if (!r) return;
   r[field] = nowHMS();
   saveRiders();
-  // Flash effect
-  cell.classList.add('flash');
-  setTimeout(() => render(), 350);
+  // Render first so the new (filled) cell exists, then flash it. Flashing the old
+  // node would be wiped by the re-render mid-animation.
+  render();
+  const fresh = document.querySelector(
+    '.time-cell[data-num="' + num + '"][data-field="' + field + '"]'
+  );
+  if (fresh) fresh.classList.add('flash');
 }
 
 function openTimeModal(cell) {
@@ -651,7 +675,8 @@ function closeTimeModal() {
 document.getElementById('timeCancel').addEventListener('click', closeTimeModal);
 document.getElementById('timeSave').addEventListener('click', () => {
   if (!editing) return;
-  const val = document.getElementById('timeInput').value;
+  const val = document.getElementById('timeInput').value.trim();
+  if (!val) { toast('To clear, use the Clear button'); return; }
   const parsed = parseTime(val);
   if (!parsed) { toast('Invalid time format'); return; }
   const r = riders.find(x => x.num === editing.num);
@@ -721,10 +746,11 @@ document.getElementById('rosterSave').addEventListener('click', () => {
   const rows = document.querySelectorAll('#rosterList .roster-row');
   const newRoster = [];
   const seenNums = new Set();
+  let skipped = 0;
   for (const row of rows) {
     const num = parseInt(row.querySelector('.num').value, 10);
     const name = row.querySelector('.nm').value.trim();
-    if (isNaN(num) || num < 1) continue;
+    if (isNaN(num) || num < 1) { skipped++; continue; }
     if (seenNums.has(num)) { toast('Duplicate rider #' + num); return; }
     seenNums.add(num);
     // Preserve existing times if rider already exists
@@ -741,10 +767,32 @@ document.getElementById('rosterSave').addEventListener('click', () => {
   saveRiders();
   closeRosterModal();
   render();
-  toast('Saved ' + riders.length + ' rider' + (riders.length === 1 ? '' : 's'));
+  let msg = 'Saved ' + riders.length + ' rider' + (riders.length === 1 ? '' : 's');
+  if (skipped) msg += ' (skipped ' + skipped + ' invalid)';
+  toast(msg);
 });
 
 // CSV import for roster
+// Parses one CSV line, handling quoted fields with embedded commas and "" escapes.
+function parseCSVLine(line) {
+  const out = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else { inQ = false; }
+      } else cur += c;
+    } else if (c === ',') { out.push(cur); cur = ''; }
+    else if (c === '"' && cur === '') { inQ = true; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
 document.getElementById('rosterImport').addEventListener('click', () => {
   document.getElementById('rosterFile').click();
 });
@@ -754,16 +802,16 @@ document.getElementById('rosterFile').addEventListener('change', e => {
   const reader = new FileReader();
   reader.onload = ev => {
     const text = ev.target.result;
-    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
     const list = document.getElementById('rosterList');
     list.innerHTML = '';
     let added = 0;
     lines.forEach((line, idx) => {
-      // Skip header if first line is non-numeric
-      if (idx === 0 && /[a-zA-Z]/.test(line.split(',')[0])) return;
-      const parts = line.split(',').map(p => p.trim().replace(/^"|"$/g, ''));
+      const parts = parseCSVLine(line);
+      // Skip header if first column of first line is non-numeric
+      if (idx === 0 && /[a-zA-Z]/.test(parts[0] || '')) return;
       const num = parseInt(parts[0], 10);
-      const name = parts[1] || '';
+      const name = (parts[1] || '').trim();
       if (!isNaN(num)) { addRosterRow(num, name); added++; }
     });
     if (added === 0) addRosterRow(1, '');
@@ -793,7 +841,9 @@ function buildCSV() {
   riders.forEach(r => rows.push([r.num, r.name, r.arrival, r.departure]));
   return rows.map(row =>
     row.map(cell => {
-      const s = String(cell == null ? '' : cell);
+      let s = String(cell == null ? '' : cell);
+      // CSV-injection guard: spreadsheets evaluate cells starting with these as formulas.
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }).join(',')
   ).join('\n');
@@ -868,12 +918,16 @@ document.getElementById('expGmail').addEventListener('click', () => {
 });
 
 // --- Send to Google Sheet ---
+const SHEET_FETCH_TIMEOUT_MS = 15000;
+
 document.getElementById('expSheets').addEventListener('click', async () => {
   if (!settings.sheetUrl) { toast('Set Sheet URL in Settings'); return; }
   const btn = document.getElementById('expSheets');
   btn.classList.remove('success', 'error');
   btn.classList.add('busy');
   btn.disabled = true;
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), SHEET_FETCH_TIMEOUT_MS);
   try {
     const payload = {
       sentAt: new Date().toISOString(),
@@ -888,7 +942,8 @@ document.getElementById('expSheets').addEventListener('click', async () => {
       mode: 'cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify(payload),
-      redirect: 'follow'
+      redirect: 'follow',
+      signal: ctrl.signal
     });
     let result = null;
     try { result = await resp.json(); } catch (e) { /* non-JSON response */ }
@@ -901,8 +956,10 @@ document.getElementById('expSheets').addEventListener('click', async () => {
     }
   } catch (e) {
     btn.classList.remove('busy'); btn.classList.add('error');
-    toast('Sync failed: ' + e.message);
+    const msg = e.name === 'AbortError' ? 'timed out' : e.message;
+    toast('Sync failed: ' + msg);
   } finally {
+    clearTimeout(timeoutId);
     btn.disabled = false;
   }
 });
@@ -959,18 +1016,24 @@ document.getElementById('settingsTest').addEventListener('click', async () => {
   const url = document.getElementById('sheetUrl').value.trim();
   if (!url) { toast('Paste a URL first'); return; }
   toast('Testing…');
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), SHEET_FETCH_TIMEOUT_MS);
   try {
     const resp = await fetch(url, {
       method: 'POST',
       mode: 'cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ test: true })
+      body: JSON.stringify({ test: true }),
+      signal: ctrl.signal
     });
     const result = await resp.json();
     if (result && result.ok) toast('✓ Sheet connection OK');
     else toast('Reached, but unexpected response');
   } catch (e) {
-    toast('Test failed: ' + e.message);
+    const msg = e.name === 'AbortError' ? 'timed out' : e.message;
+    toast('Test failed: ' + msg);
+  } finally {
+    clearTimeout(timeoutId);
   }
 });
 document.getElementById('howtoLink').addEventListener('click', e => {

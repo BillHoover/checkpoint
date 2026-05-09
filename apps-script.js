@@ -56,9 +56,9 @@ function doPost(e) {
     // Data
     const rows = body.riders.map(r => [
       Number(r.num) || '',
-      String(r.name || ''),
-      String(r.arrival || ''),
-      String(r.departure || '')
+      sanitizeForSheet(String(r.name || '')),
+      sanitizeForSheet(String(r.arrival || '')),
+      sanitizeForSheet(String(r.departure || ''))
     ]);
     if (rows.length > 0) {
       sheet.getRange(2, 1, rows.length, 4).setValues(rows);
@@ -76,8 +76,15 @@ function doPost(e) {
 
     return jsonResponse({ ok: true, tab: sheet.getName(), rows: rows.length });
   } catch (err) {
-    return jsonResponse({ ok: false, error: String(err && err.message || err) });
+    // Log details server-side; return a non-leaky message to the client.
+    console.error(err);
+    return jsonResponse({ ok: false, error: 'Server error processing request' });
   }
+}
+
+// Prevent CSV-injection: spreadsheets evaluate cells starting with these as formulas.
+function sanitizeForSheet(s) {
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
 }
 
 function doGet() {
