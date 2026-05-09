@@ -500,6 +500,12 @@ let riders = []; // [{ num, name, arrival, departure }]
 let editing = null; // { riderNum, field }
 const PRESS_MOVE_THRESHOLD_SQ = 100; // (10px)^2 — beyond this, treat press as a scroll/drag
 
+// ============ DOM HELPERS ============
+const $ = id => document.getElementById(id);
+const showModal = id => $(id).classList.add('show');
+const hideModal = id => $(id).classList.remove('show');
+const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
+
 // ============ PERSISTENCE ============
 function loadRiders() {
   try {
@@ -513,15 +519,13 @@ function saveRiders() {
 }
 
 // ============ TIME UTILS ============
-function pad(n) { return n.toString().padStart(2, '0'); }
-function nowHMS() {
-  const d = new Date();
-  return pad(d.getHours()) + ':' + pad(d.getMinutes());
-}
+const pad = n => n.toString().padStart(2, '0');
+const formatHM = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const nowHMS = () => formatHM(new Date());
+
 function tickClock() {
   const d = new Date();
-  document.getElementById('clock').textContent =
-    pad(d.getHours()) + ':' + pad(d.getMinutes());
+  $('clock').textContent = formatHM(d);
   // Reschedule on the next minute boundary instead of ticking once per second.
   const msToNextMinute = 60000 - (d.getSeconds() * 1000 + d.getMilliseconds());
   setTimeout(tickClock, msToNextMinute + 50);
@@ -550,41 +554,35 @@ function parseTime(input) {
 }
 
 // ============ RENDERING ============
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+const escapeHTML = s => String(s).replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
+
 function render() {
-  const tbody = document.getElementById('riderBody');
-  const table = document.getElementById('riderTable');
-  const empty = document.getElementById('emptyState');
+  const tbody = $('riderBody');
+  const hasRiders = riders.length > 0;
+  $('riderTable').style.display = hasRiders ? '' : 'none';
+  $('emptyState').style.display  = hasRiders ? 'none' : 'flex';
+  if (!hasRiders) return;
 
-  if (riders.length === 0) {
-    table.style.display = 'none';
-    empty.style.display = 'flex';
-    return;
-  }
-  table.style.display = '';
-  empty.style.display = 'none';
-
-  tbody.innerHTML = '';
-  riders.forEach(r => {
-    const tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td class="num-cell">' + r.num + '</td>' +
-      timeCellHTML(r, 'arrival') +
-      timeCellHTML(r, 'departure') +
-      '<td class="name-cell" title="' + escapeHTML(r.name) + '">' + escapeHTML(r.name) + '</td>';
-    tbody.appendChild(tr);
-  });
+  tbody.innerHTML = riders.map(rowHTML).join('');
   attachTimeHandlers();
+}
+
+function rowHTML(r) {
+  const safeName = escapeHTML(r.name);
+  return `
+    <tr>
+      <td class="num-cell">${r.num}</td>
+      ${timeCellHTML(r, 'arrival')}
+      ${timeCellHTML(r, 'departure')}
+      <td class="name-cell" title="${safeName}">${safeName}</td>
+    </tr>`;
 }
 
 function timeCellHTML(r, field) {
   const val = r[field];
-  const filled = !!val;
-  const cls = 'time-cell ' + (filled ? 'filled ' + field : 'empty');
-  return '<td class="' + cls + '" data-num="' + r.num + '" data-field="' + field + '">' + (filled ? val : '') + '</td>';
-}
-
-function escapeHTML(s) {
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const cls = val ? `time-cell filled ${field}` : 'time-cell empty';
+  return `<td class="${cls}" data-num="${r.num}" data-field="${field}">${val || ''}</td>`;
 }
 
 // ============ CELL INTERACTION ============
@@ -649,7 +647,7 @@ function recordCurrentTime(cell) {
   // node would be wiped by the re-render mid-animation.
   render();
   const fresh = document.querySelector(
-    '.time-cell[data-num="' + num + '"][data-field="' + field + '"]'
+    `.time-cell[data-num="${num}"][data-field="${field}"]`
   );
   if (fresh) fresh.classList.add('flash');
 }
@@ -657,92 +655,89 @@ function recordCurrentTime(cell) {
 function openTimeModal(cell) {
   const num = parseInt(cell.dataset.num, 10);
   const field = cell.dataset.field;
-  editing = { num, field };
   const r = riders.find(x => x.num === num);
-  document.getElementById('timeModalTitle').textContent =
-    (field === 'arrival' ? 'Arrival' : 'Departure') + ' — Rider #' + num + (r.name ? ' (' + r.name + ')' : '');
-  const input = document.getElementById('timeInput');
+  if (!r) return;
+  editing = { num, field };
+  const label = field === 'arrival' ? 'Arrival' : 'Departure';
+  const suffix = r.name ? ` (${r.name})` : '';
+  $('timeModalTitle').textContent = `${label} — Rider #${num}${suffix}`;
+  const input = $('timeInput');
   input.value = r[field] || '';
-  document.getElementById('timeModal').classList.add('show');
+  showModal('timeModal');
   setTimeout(() => { input.focus(); input.select(); }, 50);
 }
 
 function closeTimeModal() {
-  document.getElementById('timeModal').classList.remove('show');
+  hideModal('timeModal');
   editing = null;
 }
 
-document.getElementById('timeCancel').addEventListener('click', closeTimeModal);
-document.getElementById('timeSave').addEventListener('click', () => {
+// Set or clear the currently-edited cell's time. `parsed === ''` means clear.
+function commitEdit(parsed) {
   if (!editing) return;
-  const val = document.getElementById('timeInput').value.trim();
-  if (!val) { toast('To clear, use the Clear button'); return; }
-  const parsed = parseTime(val);
-  if (!parsed) { toast('Invalid time format'); return; }
   const r = riders.find(x => x.num === editing.num);
+  if (!r) return;
   r[editing.field] = parsed;
   saveRiders();
   closeTimeModal();
   render();
+}
+
+on('timeCancel', 'click', closeTimeModal);
+on('timeSave', 'click', () => {
+  const val = $('timeInput').value.trim();
+  if (!val)            { toast('To clear, use the Clear button'); return; }
+  const parsed = parseTime(val);
+  if (!parsed)         { toast('Invalid time format'); return; }
+  commitEdit(parsed);
 });
-document.getElementById('timeClear').addEventListener('click', () => {
-  if (!editing) return;
-  const r = riders.find(x => x.num === editing.num);
-  r[editing.field] = '';
-  saveRiders();
-  closeTimeModal();
-  render();
-});
-document.getElementById('timeInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('timeSave').click();
+on('timeClear',  'click', () => commitEdit(''));
+on('timeInput',  'keydown', e => {
+  if (e.key === 'Enter')  $('timeSave').click();
   if (e.key === 'Escape') closeTimeModal();
 });
 
 // ============ ROSTER SETUP ============
 function openRosterModal() {
-  const list = document.getElementById('rosterList');
-  list.innerHTML = '';
-  if (riders.length === 0) {
-    addRosterRow(1, '');
-  } else {
-    riders.forEach(r => addRosterRow(r.num, r.name));
-  }
-  document.getElementById('rosterModal').classList.add('show');
+  $('rosterList').innerHTML = '';
+  if (riders.length === 0) addRosterRow(1, '');
+  else riders.forEach(r => addRosterRow(r.num, r.name));
+  showModal('rosterModal');
 }
-function closeRosterModal() {
-  document.getElementById('rosterModal').classList.remove('show');
-}
+const closeRosterModal = () => hideModal('rosterModal');
 function addRosterRow(num, name) {
-  const list = document.getElementById('rosterList');
   const row = document.createElement('div');
   row.className = 'roster-row';
-  row.innerHTML =
-    '<input class="num" type="number" min="1" value="' + (num || '') + '" placeholder="#">' +
-    '<input class="nm" type="text" value="' + escapeHTML(name || '') + '" placeholder="Rider name">' +
-    '<button class="danger remove">×</button>';
+  row.innerHTML = `
+    <input class="num" type="number" min="1" value="${num || ''}" placeholder="#">
+    <input class="nm" type="text" value="${escapeHTML(name || '')}" placeholder="Rider name">
+    <button class="danger remove">×</button>`;
   row.querySelector('.remove').addEventListener('click', () => row.remove());
-  list.appendChild(row);
+  $('rosterList').appendChild(row);
 }
 
-document.getElementById('setupBtn').addEventListener('click', openRosterModal);
-document.getElementById('setupBtn2').addEventListener('click', openRosterModal);
-document.getElementById('rosterCancel').addEventListener('click', closeRosterModal);
-document.getElementById('rosterAdd').addEventListener('click', () => {
-  const list = document.getElementById('rosterList');
-  // Suggest next number
-  const nums = Array.from(list.querySelectorAll('input.num')).map(i => parseInt(i.value, 10)).filter(n => !isNaN(n));
+on('setupBtn',     'click', openRosterModal);
+on('setupBtn2',    'click', openRosterModal);
+on('rosterCancel', 'click', closeRosterModal);
+
+on('rosterAdd', 'click', () => {
+  // Suggest next sequential number
+  const nums = Array.from($('rosterList').querySelectorAll('input.num'))
+    .map(i => parseInt(i.value, 10))
+    .filter(n => !isNaN(n));
   const next = nums.length ? Math.max(...nums) + 1 : 1;
   addRosterRow(next, '');
 });
-document.getElementById('rosterClear').addEventListener('click', () => {
-  if (confirm('Clear all riders AND all recorded times? This cannot be undone.')) {
-    riders = [];
-    saveRiders();
-    closeRosterModal();
-    render();
-  }
+
+on('rosterClear', 'click', () => {
+  if (!confirm('Clear all riders AND all recorded times? This cannot be undone.')) return;
+  riders = [];
+  saveRiders();
+  closeRosterModal();
+  render();
 });
-document.getElementById('rosterSave').addEventListener('click', () => {
+
+on('rosterSave', 'click', () => {
   const rows = document.querySelectorAll('#rosterList .roster-row');
   const newRoster = [];
   const seenNums = new Set();
@@ -751,15 +746,14 @@ document.getElementById('rosterSave').addEventListener('click', () => {
     const num = parseInt(row.querySelector('.num').value, 10);
     const name = row.querySelector('.nm').value.trim();
     if (isNaN(num) || num < 1) { skipped++; continue; }
-    if (seenNums.has(num)) { toast('Duplicate rider #' + num); return; }
+    if (seenNums.has(num))     { toast(`Duplicate rider #${num}`); return; }
     seenNums.add(num);
-    // Preserve existing times if rider already exists
-    const existing = riders.find(r => r.num === num);
+    // Preserve existing times if this rider was already in the roster.
+    const prev = riders.find(r => r.num === num);
     newRoster.push({
-      num,
-      name,
-      arrival: existing ? existing.arrival : '',
-      departure: existing ? existing.departure : ''
+      num, name,
+      arrival:   prev ? prev.arrival   : '',
+      departure: prev ? prev.departure : ''
     });
   }
   newRoster.sort((a, b) => a.num - b.num);
@@ -767,9 +761,9 @@ document.getElementById('rosterSave').addEventListener('click', () => {
   saveRiders();
   closeRosterModal();
   render();
-  let msg = 'Saved ' + riders.length + ' rider' + (riders.length === 1 ? '' : 's');
-  if (skipped) msg += ' (skipped ' + skipped + ' invalid)';
-  toast(msg);
+  const plural = riders.length === 1 ? '' : 's';
+  const tail = skipped ? ` (skipped ${skipped} invalid)` : '';
+  toast(`Saved ${riders.length} rider${plural}${tail}`);
 });
 
 // CSV import for roster
@@ -793,29 +787,27 @@ function parseCSVLine(line) {
   return out;
 }
 
-document.getElementById('rosterImport').addEventListener('click', () => {
-  document.getElementById('rosterFile').click();
-});
-document.getElementById('rosterFile').addEventListener('change', e => {
+on('rosterImport', 'click', () => $('rosterFile').click());
+
+on('rosterFile', 'change', e => {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    const text = ev.target.result;
-    const lines = text.split(/\r?\n/).filter(l => l.trim());
-    const list = document.getElementById('rosterList');
-    list.innerHTML = '';
+    const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
+    $('rosterList').innerHTML = '';
     let added = 0;
     lines.forEach((line, idx) => {
       const parts = parseCSVLine(line);
-      // Skip header if first column of first line is non-numeric
+      // Skip a header row whose first column is non-numeric (e.g. "Number,Name").
       if (idx === 0 && /[a-zA-Z]/.test(parts[0] || '')) return;
       const num = parseInt(parts[0], 10);
-      const name = (parts[1] || '').trim();
-      if (!isNaN(num)) { addRosterRow(num, name); added++; }
+      if (isNaN(num)) return;
+      addRosterRow(num, (parts[1] || '').trim());
+      added++;
     });
     if (added === 0) addRosterRow(1, '');
-    toast('Imported ' + added + ' rows');
+    toast(`Imported ${added} rows`);
     e.target.value = '';
   };
   reader.readAsText(file);
@@ -851,81 +843,82 @@ function buildCSV() {
 
 function exportFilename() {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return 'checkpoint-' + stamp + '.csv';
+  return `checkpoint-${stamp}.csv`;
 }
 
-// --- Open the export menu ---
-document.getElementById('exportBtn').addEventListener('click', () => {
-  if (riders.length === 0) { toast('No data to export'); return; }
-  // Update summary
-  const filled = riders.filter(r => r.arrival || r.departure).length;
-  document.getElementById('exportSummary').textContent =
-    riders.length + ' rider' + (riders.length === 1 ? '' : 's') +
-    ' • ' + filled + ' with recorded times';
-  // Sheets row enable/disable
-  const sheetBtn = document.getElementById('expSheets');
-  const sheetSub = document.getElementById('expSheetsSub');
-  if (settings.sheetUrl) {
-    sheetBtn.disabled = false;
-    try { sheetSub.textContent = 'Append to ' + new URL(settings.sheetUrl).hostname; }
-    catch (e) { sheetSub.textContent = 'Append a new tab to your sheet'; }
-  } else {
-    sheetBtn.disabled = true;
-    sheetSub.textContent = 'Configure URL in Settings first';
-  }
-  // Show share option only where it's actually useful (mobile)
-  const shareBtn = document.getElementById('expShare');
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  shareBtn.style.display = (isMobile && navigator.canShare) ? '' : 'none';
-  // Reset any prior status colors
-  document.querySelectorAll('.export-opt').forEach(b => b.classList.remove('busy', 'success', 'error'));
-  document.getElementById('exportModal').classList.add('show');
-});
+const SHEET_FETCH_TIMEOUT_MS = 15000;
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const closeExportModal = () => hideModal('exportModal');
 
-document.getElementById('exportCancel').addEventListener('click', () => {
-  document.getElementById('exportModal').classList.remove('show');
-});
+// --- Open the export menu ---
+function openExportMenu() {
+  if (riders.length === 0) { toast('No data to export'); return; }
+
+  const filled = riders.filter(r => r.arrival || r.departure).length;
+  const plural = riders.length === 1 ? '' : 's';
+  $('exportSummary').textContent =
+    `${riders.length} rider${plural} • ${filled} with recorded times`;
+
+  configureSheetsButton();
+
+  // Show the system-share option only on mobile (desktop share sheets are poor).
+  $('expShare').style.display = (IS_MOBILE && navigator.canShare) ? '' : 'none';
+
+  // Reset any prior status colors from earlier sync attempts.
+  document.querySelectorAll('.export-opt')
+    .forEach(b => b.classList.remove('busy', 'success', 'error'));
+
+  showModal('exportModal');
+}
+
+function configureSheetsButton() {
+  const btn = $('expSheets');
+  const sub = $('expSheetsSub');
+  if (!settings.sheetUrl) {
+    btn.disabled = true;
+    sub.textContent = 'Configure URL in Settings first';
+    return;
+  }
+  btn.disabled = false;
+  try { sub.textContent = `Append to ${new URL(settings.sheetUrl).hostname}`; }
+  catch (e) { sub.textContent = 'Append a new tab to your sheet'; }
+}
 
 // --- Save file ---
-document.getElementById('expSave').addEventListener('click', () => {
-  const csv = buildCSV();
+function saveCSVFile() {
   const filename = exportFilename();
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-  fallbackDownload(blob, filename);
-  document.getElementById('exportModal').classList.remove('show');
-  toast('Saved ' + filename);
-});
+  const blob = new Blob([buildCSV()], { type: 'text/csv;charset=utf-8' });
+  triggerDownload(blob, filename);
+  closeExportModal();
+  toast(`Saved ${filename}`);
+}
 
 // --- Email via Gmail ---
-document.getElementById('expGmail').addEventListener('click', () => {
+function emailViaGmail() {
   const csv = buildCSV();
-  const subject = 'Checkpoint export ' + new Date().toLocaleString();
-  // Body has a header line and the CSV inline. Gmail can paste it as-is.
+  const now = new Date();
+  const subject = `Checkpoint export ${now.toLocaleString()}`;
+  // Body: a small header followed by inline CSV. Gmail can paste it as-is.
   const body =
-    'Checkpoint data export\n' +
-    new Date().toString() + '\n' +
-    'Riders: ' + riders.length + '\n\n' +
-    csv;
-  const to = encodeURIComponent(settings.emailTo || '');
-  // Gmail web compose URL — works on desktop and falls back gracefully on mobile
-  const gmailUrl =
+    `Checkpoint data export\n${now.toString()}\nRiders: ${riders.length}\n\n${csv}`;
+  // Gmail web compose URL — works on desktop and falls back gracefully on mobile.
+  const url =
     'https://mail.google.com/mail/?view=cm&fs=1' +
-    '&to=' + to +
-    '&su=' + encodeURIComponent(subject) +
-    '&body=' + encodeURIComponent(body);
-  window.open(gmailUrl, '_blank', 'noopener');
-  document.getElementById('exportModal').classList.remove('show');
-});
+    `&to=${encodeURIComponent(settings.emailTo || '')}` +
+    `&su=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+  window.open(url, '_blank', 'noopener');
+  closeExportModal();
+}
 
 // --- Send to Google Sheet ---
-const SHEET_FETCH_TIMEOUT_MS = 15000;
-
-document.getElementById('expSheets').addEventListener('click', async () => {
+async function syncToSheet() {
   if (!settings.sheetUrl) { toast('Set Sheet URL in Settings'); return; }
-  const btn = document.getElementById('expSheets');
+  const btn = $('expSheets');
   btn.classList.remove('success', 'error');
   btn.classList.add('busy');
   btn.disabled = true;
+
   const ctrl = new AbortController();
   const timeoutId = setTimeout(() => ctrl.abort(), SHEET_FETCH_TIMEOUT_MS);
   try {
@@ -936,7 +929,7 @@ document.getElementById('expSheets').addEventListener('click', async () => {
         num: r.num, name: r.name, arrival: r.arrival, departure: r.departure
       }))
     };
-    // Apps Script web apps require text/plain to avoid CORS preflight.
+    // Apps Script web apps require text/plain to avoid a CORS preflight.
     const resp = await fetch(settings.sheetUrl, {
       method: 'POST',
       mode: 'cors',
@@ -947,40 +940,39 @@ document.getElementById('expSheets').addEventListener('click', async () => {
     });
     let result = null;
     try { result = await resp.json(); } catch (e) { /* non-JSON response */ }
-    if (resp.ok && result && result.ok) {
-      btn.classList.remove('busy'); btn.classList.add('success');
-      toast('Synced to Sheet (' + result.rows + ' rows, tab "' + result.tab + '")');
-      setTimeout(() => document.getElementById('exportModal').classList.remove('show'), 700);
-    } else {
-      throw new Error((result && result.error) || ('HTTP ' + resp.status));
+
+    if (!resp.ok || !result || !result.ok) {
+      throw new Error((result && result.error) || `HTTP ${resp.status}`);
     }
+    btn.classList.replace('busy', 'success');
+    toast(`Synced to Sheet (${result.rows} rows, tab "${result.tab}")`);
+    setTimeout(closeExportModal, 700);
   } catch (e) {
-    btn.classList.remove('busy'); btn.classList.add('error');
-    const msg = e.name === 'AbortError' ? 'timed out' : e.message;
-    toast('Sync failed: ' + msg);
+    btn.classList.replace('busy', 'error');
+    const reason = e.name === 'AbortError' ? 'timed out' : e.message;
+    toast(`Sync failed: ${reason}`);
   } finally {
     clearTimeout(timeoutId);
     btn.disabled = false;
   }
-});
+}
 
 // --- System share (mobile only) ---
-document.getElementById('expShare').addEventListener('click', () => {
-  const csv = buildCSV();
+function shareViaSystem() {
   const filename = exportFilename();
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob([buildCSV()], { type: 'text/csv;charset=utf-8' });
   const file = new File([blob], filename, { type: 'text/csv' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     navigator.share({ files: [file], title: 'Checkpoint Export' })
-      .then(() => document.getElementById('exportModal').classList.remove('show'))
+      .then(closeExportModal)
       .catch(() => { /* user cancelled */ });
   } else {
-    fallbackDownload(blob, filename);
-    document.getElementById('exportModal').classList.remove('show');
+    triggerDownload(blob, filename);
+    closeExportModal();
   }
-});
+}
 
-function fallbackDownload(blob, filename) {
+function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -991,29 +983,38 @@ function fallbackDownload(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
+on('exportBtn',    'click', openExportMenu);
+on('exportCancel', 'click', closeExportModal);
+on('expSave',      'click', saveCSVFile);
+on('expGmail',     'click', emailViaGmail);
+on('expSheets',    'click', syncToSheet);
+on('expShare',     'click', shareViaSystem);
+
 // ============ SETTINGS ============
-document.getElementById('exportSettingsBtn').addEventListener('click', () => {
-  document.getElementById('sheetUrl').value = settings.sheetUrl || '';
-  document.getElementById('emailTo').value = settings.emailTo || '';
-  document.getElementById('settingsModal').classList.add('show');
-});
-document.getElementById('settingsCancel').addEventListener('click', () => {
-  document.getElementById('settingsModal').classList.remove('show');
-});
-document.getElementById('settingsSave').addEventListener('click', () => {
-  const url = document.getElementById('sheetUrl').value.trim();
-  const email = document.getElementById('emailTo').value.trim();
-  if (url && !/^https:\/\/script\.google\.com\//.test(url)) {
-    if (!confirm('That URL doesn\'t look like a Google Apps Script Web App URL. Save it anyway?')) return;
+const APPS_SCRIPT_URL_RE = /^https:\/\/script\.google\.com\//;
+
+function openSettings() {
+  $('sheetUrl').value = settings.sheetUrl || '';
+  $('emailTo').value  = settings.emailTo  || '';
+  showModal('settingsModal');
+}
+
+function saveSettingsFromForm() {
+  const url   = $('sheetUrl').value.trim();
+  const email = $('emailTo').value.trim();
+  if (url && !APPS_SCRIPT_URL_RE.test(url)) {
+    const ok = confirm("That URL doesn't look like a Google Apps Script Web App URL. Save it anyway?");
+    if (!ok) return;
   }
   settings.sheetUrl = url;
-  settings.emailTo = email;
+  settings.emailTo  = email;
   saveSettings();
-  document.getElementById('settingsModal').classList.remove('show');
+  hideModal('settingsModal');
   toast('Settings saved');
-});
-document.getElementById('settingsTest').addEventListener('click', async () => {
-  const url = document.getElementById('sheetUrl').value.trim();
+}
+
+async function testSheetUrl() {
+  const url = $('sheetUrl').value.trim();
   if (!url) { toast('Paste a URL first'); return; }
   toast('Testing…');
   const ctrl = new AbortController();
@@ -1027,27 +1028,26 @@ document.getElementById('settingsTest').addEventListener('click', async () => {
       signal: ctrl.signal
     });
     const result = await resp.json();
-    if (result && result.ok) toast('✓ Sheet connection OK');
-    else toast('Reached, but unexpected response');
+    toast(result && result.ok ? '✓ Sheet connection OK' : 'Reached, but unexpected response');
   } catch (e) {
-    const msg = e.name === 'AbortError' ? 'timed out' : e.message;
-    toast('Test failed: ' + msg);
+    const reason = e.name === 'AbortError' ? 'timed out' : e.message;
+    toast(`Test failed: ${reason}`);
   } finally {
     clearTimeout(timeoutId);
   }
-});
-document.getElementById('howtoLink').addEventListener('click', e => {
-  e.preventDefault();
-  document.getElementById('howtoModal').classList.add('show');
-});
-document.getElementById('howtoClose').addEventListener('click', () => {
-  document.getElementById('howtoModal').classList.remove('show');
-});
+}
+
+on('exportSettingsBtn', 'click', openSettings);
+on('settingsCancel',    'click', () => hideModal('settingsModal'));
+on('settingsSave',      'click', saveSettingsFromForm);
+on('settingsTest',      'click', testSheetUrl);
+on('howtoLink',  'click', e => { e.preventDefault(); showModal('howtoModal'); });
+on('howtoClose', 'click', () => hideModal('howtoModal'));
 
 // ============ TOAST ============
 let toastTimer = null;
 function toast(msg) {
-  const t = document.getElementById('toast');
+  const t = $('toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
