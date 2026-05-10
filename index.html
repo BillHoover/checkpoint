@@ -1,1073 +1,1276 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1a1a1a">
-<title>Checkpoint</title>
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-<style>
-  :root {
-    --bg: #1a1a1a;
-    --panel: #232323;
-    --panel-2: #2a2a2a;
-    --border: #3a3a3a;
-    --text: #f0f0f0;
-    --text-dim: #888;
-    --empty-tint: #3d2817;       /* warm tinted empty cell */
-    --empty-tint-hover: #4a3120;
-    --filled: #1e3a2a;            /* green for arrived */
-    --filled-2: #2a4a36;
-    --depart: #1e2a3a;            /* blue for departed */
-    --depart-2: #2a3848;
-    --accent: #f5a623;
-    --danger: #c0392b;
-    --row-h: 52px;
-  }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body {
-    margin: 0; padding: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Mono", Menlo, monospace;
-    overscroll-behavior: none;
-    -webkit-user-select: none;
-    user-select: none;
-    height: 100vh;
-    height: 100dvh;
-    overflow: hidden;
-  }
-  body {
-    display: flex;
-    flex-direction: column;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    gap: 8px;
-    flex-shrink: 0;
-  }
-  .title {
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-  .clock {
-    font-variant-numeric: tabular-nums;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text);
-  }
-  .actions { display: flex; gap: 6px; }
-  button {
-    background: var(--panel-2);
-    color: var(--text);
-    border: 1px solid var(--border);
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    min-height: 36px;
-  }
-  button:active { background: var(--border); }
-  button.primary { background: var(--accent); color: #000; border-color: var(--accent); }
-  button.danger { background: var(--danger); border-color: var(--danger); color: white; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#1a1a1a" />
+    <title>Checkpoint</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="icon-192.png" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+    <style>
+      :root {
+        --bg: #1a1a1a;
+        --panel: #232323;
+        --panel-2: #2a2a2a;
+        --border: #3a3a3a;
+        --text: #f0f0f0;
+        --text-dim: #888;
+        --empty-tint: #3d2817; /* warm tinted empty cell */
+        --empty-tint-hover: #4a3120;
+        --filled: #1e3a2a; /* green for arrived */
+        --filled-2: #2a4a36;
+        --depart: #1e2a3a; /* blue for departed */
+        --depart-2: #2a3848;
+        --accent: #f5a623;
+        --danger: #c0392b;
+        --row-h: 52px;
+      }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Mono', Menlo, monospace;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        gap: 8px;
+        flex-shrink: 0;
+      }
+      .title {
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .clock {
+        font-variant-numeric: tabular-nums;
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .actions {
+        display: flex;
+        gap: 6px;
+      }
+      button {
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 36px;
+      }
+      button:active {
+        background: var(--border);
+      }
+      button.primary {
+        background: var(--accent);
+        color: #000;
+        border-color: var(--accent);
+      }
+      button.danger {
+        background: var(--danger);
+        border-color: var(--danger);
+        color: white;
+      }
 
-  .table-wrap {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-  }
-  thead th {
-    position: sticky;
-    top: 0;
-    background: var(--panel);
-    color: var(--text-dim);
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-weight: 700;
-    padding: 8px 6px;
-    border-bottom: 2px solid var(--border);
-    text-align: center;
-    z-index: 5;
-  }
-  tbody td {
-    border-bottom: 1px solid var(--border);
-    border-right: 1px solid var(--border);
-    height: var(--row-h);
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    font-size: 18px;
-    font-weight: 600;
-    padding: 0;
-    position: relative;
-  }
-  tbody td:last-child { border-right: none; }
+      .table-wrap {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      thead th {
+        position: sticky;
+        top: 0;
+        background: var(--panel);
+        color: var(--text-dim);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 700;
+        padding: 8px 6px;
+        border-bottom: 2px solid var(--border);
+        text-align: center;
+        z-index: 5;
+      }
+      tbody td {
+        border-bottom: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+        height: var(--row-h);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        font-size: 18px;
+        font-weight: 600;
+        padding: 0;
+        position: relative;
+      }
+      tbody td:last-child {
+        border-right: none;
+      }
 
-  /* Column widths */
-  col.col-num   { width: 10%; }
-  col.col-arr   { width: 19%; }
-  col.col-dep   { width: 19%; }
-  col.col-name  { width: 52%; }
+      /* Column widths */
+      col.col-num {
+        width: 10%;
+      }
+      col.col-arr {
+        width: 19%;
+      }
+      col.col-dep {
+        width: 19%;
+      }
+      col.col-name {
+        width: 52%;
+      }
 
-  .num-cell {
-    background: var(--panel-2);
-    color: var(--text-dim);
-    font-weight: 700;
-  }
-  .name-cell {
-    text-align: left;
-    padding: 0 10px;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+      .num-cell {
+        background: var(--panel-2);
+        color: var(--text-dim);
+        font-weight: 700;
+      }
+      .name-cell {
+        text-align: left;
+        padding: 0 10px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
 
-  /* Time cells - the core interaction */
-  .time-cell {
-    cursor: pointer;
-    user-select: none;
-    -webkit-user-select: none;
-    transition: background-color 0.12s;
-  }
-  .time-cell.empty {
-    background: var(--empty-tint);
-    color: transparent;
-  }
-  .time-cell.empty::before {
-    content: "—";
-    color: rgba(255,255,255,0.25);
-    font-size: 22px;
-  }
-  .time-cell.empty:active { background: var(--empty-tint-hover); }
-  .time-cell.filled.arrival { background: var(--filled); color: #b6f0c9; }
-  .time-cell.filled.arrival:active { background: var(--filled-2); }
-  .time-cell.filled.departure { background: var(--depart); color: #b6d4f0; }
-  .time-cell.filled.departure:active { background: var(--depart-2); }
+      /* Time cells - the core interaction */
+      .time-cell {
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        transition: background-color 0.12s;
+      }
+      .time-cell.empty {
+        background: var(--empty-tint);
+        color: transparent;
+      }
+      .time-cell.empty::before {
+        content: '—';
+        color: rgba(255, 255, 255, 0.25);
+        font-size: 22px;
+      }
+      .time-cell.empty:active {
+        background: var(--empty-tint-hover);
+      }
+      .time-cell.filled.arrival {
+        background: var(--filled);
+        color: #b6f0c9;
+      }
+      .time-cell.filled.arrival:active {
+        background: var(--filled-2);
+      }
+      .time-cell.filled.departure {
+        background: var(--depart);
+        color: #b6d4f0;
+      }
+      .time-cell.filled.departure:active {
+        background: var(--depart-2);
+      }
 
-  /* Flash on tap */
-  @keyframes flash {
-    0% { background: var(--accent); }
-    100% { }
-  }
-  .time-cell.flash { animation: flash 0.4s ease-out; }
+      /* Flash on tap */
+      @keyframes flash {
+        0% {
+          background: var(--accent);
+        }
+        100% {
+        }
+      }
+      .time-cell.flash {
+        animation: flash 0.4s ease-out;
+      }
 
-  /* Modal */
-  .modal-bg {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.7);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    padding: 20px;
-  }
-  .modal-bg.show { display: flex; }
-  .modal {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-    width: 100%;
-    max-width: 360px;
-  }
-  .modal h3 {
-    margin: 0 0 14px 0;
-    font-size: 14px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--accent);
-  }
-  .modal label {
-    display: block;
-    font-size: 11px;
-    color: var(--text-dim);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin: 10px 0 4px;
-  }
-  .modal input {
-    width: 100%;
-    padding: 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--text);
-    font-family: inherit;
-    font-size: 18px;
-    font-variant-numeric: tabular-nums;
-  }
-  .modal input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
-  .modal-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 16px;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-  }
-  .hint {
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-top: 6px;
-  }
+      /* Modal */
+      .modal-bg {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 20px;
+      }
+      .modal-bg.show {
+        display: flex;
+      }
+      .modal {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 20px;
+        width: 100%;
+        max-width: 360px;
+      }
+      .modal h3 {
+        margin: 0 0 14px 0;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--accent);
+      }
+      .modal label {
+        display: block;
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin: 10px 0 4px;
+      }
+      .modal input {
+        width: 100%;
+        padding: 12px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 18px;
+        font-variant-numeric: tabular-nums;
+      }
+      .modal input:focus {
+        outline: 2px solid var(--accent);
+        border-color: var(--accent);
+      }
+      .modal-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+      }
+      .hint {
+        font-size: 11px;
+        color: var(--text-dim);
+        margin-top: 6px;
+      }
 
-  /* Export options */
-  .export-options {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-  .export-opt {
-    display: block;
-    width: 100%;
-    text-align: left;
-    padding: 12px 14px;
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    cursor: pointer;
-    min-height: auto;
-    transition: background-color 0.12s, border-color 0.12s;
-  }
-  .export-opt:active { background: var(--border); }
-  .export-opt:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-  .export-opt .opt-title {
-    display: block;
-    font-size: 14px;
-    font-weight: 600;
-    margin-bottom: 2px;
-  }
-  .export-opt .opt-sub {
-    display: block;
-    font-size: 11px;
-    color: var(--text-dim);
-    font-weight: 400;
-  }
-  .export-opt.busy { border-color: var(--accent); }
-  .export-opt.busy .opt-title::after {
-    content: " — sending…";
-    color: var(--accent);
-    font-weight: 400;
-  }
-  .export-opt.success { border-color: #2a7a47; }
-  .export-opt.error { border-color: var(--danger); }
+      /* Export options */
+      .export-options {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .export-opt {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 12px 14px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        cursor: pointer;
+        min-height: auto;
+        transition:
+          background-color 0.12s,
+          border-color 0.12s;
+      }
+      .export-opt:active {
+        background: var(--border);
+      }
+      .export-opt:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .export-opt .opt-title {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+      .export-opt .opt-sub {
+        display: block;
+        font-size: 11px;
+        color: var(--text-dim);
+        font-weight: 400;
+      }
+      .export-opt.busy {
+        border-color: var(--accent);
+      }
+      .export-opt.busy .opt-title::after {
+        content: ' — sending…';
+        color: var(--accent);
+        font-weight: 400;
+      }
+      .export-opt.success {
+        border-color: #2a7a47;
+      }
+      .export-opt.error {
+        border-color: var(--danger);
+      }
 
-  /* Setup modal - roster */
-  .roster-list {
-    max-height: 280px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-top: 4px;
-  }
-  .roster-row {
-    display: flex;
-    gap: 6px;
-    padding: 6px;
-    border-bottom: 1px solid var(--border);
-  }
-  .roster-row:last-child { border-bottom: none; }
-  .roster-row input { font-size: 14px; padding: 8px; }
-  .roster-row input.num { flex: 0 0 60px; text-align: center; }
-  .roster-row input.nm { flex: 1; }
-  .roster-row button { padding: 6px 10px; min-height: auto; }
+      /* Setup modal - roster */
+      .roster-list {
+        max-height: 280px;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        margin-top: 4px;
+      }
+      .roster-row {
+        display: flex;
+        gap: 6px;
+        padding: 6px;
+        border-bottom: 1px solid var(--border);
+      }
+      .roster-row:last-child {
+        border-bottom: none;
+      }
+      .roster-row input {
+        font-size: 14px;
+        padding: 8px;
+      }
+      .roster-row input.num {
+        flex: 0 0 60px;
+        text-align: center;
+      }
+      .roster-row input.nm {
+        flex: 1;
+      }
+      .roster-row button {
+        padding: 6px 10px;
+        min-height: auto;
+      }
 
-  /* Empty state */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: var(--text-dim);
-    text-align: center;
-    padding: 20px;
-    gap: 16px;
-  }
-  .empty-state h2 { margin: 0; font-size: 18px; color: var(--text); }
-  .empty-state p { margin: 0; font-size: 14px; line-height: 1.5; }
+      /* Empty state */
+      .empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: var(--text-dim);
+        text-align: center;
+        padding: 20px;
+        gap: 16px;
+      }
+      .empty-state h2 {
+        margin: 0;
+        font-size: 18px;
+        color: var(--text);
+      }
+      .empty-state p {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+      }
 
-  /* Toast */
-  .toast {
-    position: fixed;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--panel);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 10px 16px;
-    border-radius: 6px;
-    font-size: 13px;
-    z-index: 200;
-    opacity: 0;
-    transition: opacity 0.2s;
-    pointer-events: none;
-  }
-  .toast.show { opacity: 1; }
+      /* Toast */
+      .toast {
+        position: fixed;
+        bottom: calc(20px + env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 10px 16px;
+        border-radius: 6px;
+        font-size: 13px;
+        z-index: 200;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+      }
+      .toast.show {
+        opacity: 1;
+      }
 
-  /* Larger screens */
-  @media (min-width: 768px) {
-    tbody td { font-size: 22px; }
-    .name-cell { font-size: 16px; }
-    :root { --row-h: 60px; }
-  }
-</style>
-</head>
-<body>
+      /* Larger screens */
+      @media (min-width: 768px) {
+        tbody td {
+          font-size: 22px;
+        }
+        .name-cell {
+          font-size: 16px;
+        }
+        :root {
+          --row-h: 60px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="title">Checkpoint</div>
+      <div class="clock" id="clock">--:--</div>
+      <div class="actions">
+        <button id="setupBtn" title="Roster setup">Roster</button>
+        <button id="exportBtn" class="primary" title="Export options">Export ▾</button>
+      </div>
+    </header>
 
-<header>
-  <div class="title">Checkpoint</div>
-  <div class="clock" id="clock">--:--</div>
-  <div class="actions">
-    <button id="setupBtn" title="Roster setup">Roster</button>
-    <button id="exportBtn" class="primary" title="Export options">Export ▾</button>
-  </div>
-</header>
-
-<div class="table-wrap" id="tableWrap">
-  <div class="empty-state" id="emptyState">
-    <h2>No riders loaded</h2>
-    <p>Tap <strong>Roster</strong> to add riders before the event starts.</p>
-    <button id="setupBtn2" class="primary">Set up roster</button>
-  </div>
-  <table id="riderTable" style="display:none;">
-    <colgroup>
-      <col class="col-num">
-      <col class="col-arr">
-      <col class="col-dep">
-      <col class="col-name">
-    </colgroup>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Arrival</th>
-        <th>Departure</th>
-        <th>Name</th>
-      </tr>
-    </thead>
-    <tbody id="riderBody"></tbody>
-  </table>
-</div>
-
-<!-- Time edit modal -->
-<div class="modal-bg" id="timeModal">
-  <div class="modal">
-    <h3 id="timeModalTitle">Edit time</h3>
-    <label for="timeInput">Time (HH:MM, 24-hour)</label>
-    <input type="text" id="timeInput" inputmode="numeric" placeholder="14:35" autocomplete="off">
-    <div class="hint">24-hour local time. Use a colon or just digits (e.g. 1435 → 14:35).</div>
-    <div class="modal-actions">
-      <button id="timeClear" class="danger">Clear</button>
-      <button id="timeCancel">Cancel</button>
-      <button id="timeSave" class="primary">Save</button>
+    <div class="table-wrap" id="tableWrap">
+      <div class="empty-state" id="emptyState">
+        <h2>No riders loaded</h2>
+        <p>Tap <strong>Roster</strong> to add riders before the event starts.</p>
+        <button id="setupBtn2" class="primary">Set up roster</button>
+      </div>
+      <table id="riderTable" style="display: none">
+        <colgroup>
+          <col class="col-num" />
+          <col class="col-arr" />
+          <col class="col-dep" />
+          <col class="col-name" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Arrival</th>
+            <th>Departure</th>
+            <th>Name</th>
+          </tr>
+        </thead>
+        <tbody id="riderBody"></tbody>
+      </table>
     </div>
-  </div>
-</div>
 
-<!-- Export options modal -->
-<div class="modal-bg" id="exportModal">
-  <div class="modal">
-    <h3>Export Data</h3>
-    <div class="hint" id="exportSummary" style="margin-bottom: 14px;"></div>
-    <div class="export-options">
-      <button class="export-opt" id="expSave">
-        <span class="opt-title">💾 Save CSV file</span>
-        <span class="opt-sub">Download to this device</span>
-      </button>
-      <button class="export-opt" id="expGmail">
-        <span class="opt-title">✉️ Email via Gmail</span>
-        <span class="opt-sub">Opens Gmail compose with CSV pasted in</span>
-      </button>
-      <button class="export-opt" id="expSheets">
-        <span class="opt-title">📊 Send to Google Sheet</span>
-        <span class="opt-sub" id="expSheetsSub">Configure URL in Settings first</span>
-      </button>
-      <button class="export-opt" id="expShare" style="display:none;">
-        <span class="opt-title">📤 Share…</span>
-        <span class="opt-sub">System share sheet</span>
-      </button>
-    </div>
-    <div class="modal-actions">
-      <button id="exportSettingsBtn">Settings</button>
-      <button id="exportCancel">Close</button>
-    </div>
-  </div>
-</div>
-
-<!-- Settings modal -->
-<div class="modal-bg" id="settingsModal">
-  <div class="modal" style="max-width: 480px;">
-    <h3>Settings</h3>
-    <label for="sheetUrl">Google Apps Script Web App URL</label>
-    <input type="text" id="sheetUrl" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/.../exec">
-    <div class="hint" id="settingsHint" style="margin-top: 6px;">
-      Paste the Web App URL from your deployed Apps Script.
-      <a href="#" id="howtoLink" style="color: var(--accent); text-decoration: underline;">How to set this up</a>
-    </div>
-    <label for="emailTo">Default email recipient (optional)</label>
-    <input type="email" id="emailTo" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="results@example.com">
-    <div class="hint">Used as the To: when emailing via Gmail.</div>
-    <div class="modal-actions">
-      <button id="settingsTest">Test Sheet URL</button>
-      <button id="settingsCancel">Cancel</button>
-      <button id="settingsSave" class="primary">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- How-to modal -->
-<div class="modal-bg" id="howtoModal">
-  <div class="modal" style="max-width: 520px;">
-    <h3>Google Sheets Setup</h3>
-    <div style="font-size: 13px; line-height: 1.55; color: var(--text);">
-      <p><strong>One-time setup</strong> (takes about 2 minutes):</p>
-      <ol style="padding-left: 20px;">
-        <li>Open or create a Google Sheet.</li>
-        <li>Menu → <strong>Extensions → Apps Script</strong>.</li>
-        <li>Delete the default code, paste the script (see <code>apps-script.js</code> file with this app), save.</li>
-        <li>Click <strong>Deploy → New deployment</strong> → gear icon → <strong>Web app</strong>.</li>
-        <li>Set <em>Execute as</em>: <strong>Me</strong>, <em>Who has access</em>: <strong>Anyone</strong>. Click Deploy.</li>
-        <li>Authorize when prompted.</li>
-        <li>Copy the <strong>Web app URL</strong> and paste it into Settings.</li>
-      </ol>
-      <p style="color: var(--text-dim);">Anyone with that URL can append rows to your sheet, so don't post it publicly. Each "Send to Google Sheet" appends a tab with the timestamp; nothing is overwritten.</p>
-    </div>
-    <div class="modal-actions">
-      <button id="howtoClose" class="primary">Got it</button>
-    </div>
-  </div>
-</div>
-
-<!-- Roster setup modal -->
-<div class="modal-bg" id="rosterModal">
-  <div class="modal" style="max-width: 480px;">
-    <h3>Roster Setup</h3>
-    <div class="hint" style="margin-bottom: 8px;">Pre-load riders. Numbers must be unique. Data persists offline.</div>
-    <div class="roster-list" id="rosterList"></div>
-    <div class="modal-actions" style="justify-content: space-between;">
-      <button id="rosterAdd">+ Add Rider</button>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button id="rosterImport">Import CSV</button>
-        <input type="file" id="rosterFile" accept=".csv,.txt" style="display:none;">
-        <button id="rosterClear" class="danger">Clear All</button>
+    <!-- Time edit modal -->
+    <div class="modal-bg" id="timeModal">
+      <div class="modal">
+        <h3 id="timeModalTitle">Edit time</h3>
+        <label for="timeInput">Time (HH:MM, 24-hour)</label>
+        <input
+          type="text"
+          id="timeInput"
+          inputmode="numeric"
+          placeholder="14:35"
+          autocomplete="off"
+        />
+        <div class="hint">24-hour local time. Use a colon or just digits (e.g. 1435 → 14:35).</div>
+        <div class="modal-actions">
+          <button id="timeClear" class="danger">Clear</button>
+          <button id="timeCancel">Cancel</button>
+          <button id="timeSave" class="primary">Save</button>
+        </div>
       </div>
     </div>
-    <div class="modal-actions">
-      <button id="rosterCancel">Cancel</button>
-      <button id="rosterSave" class="primary">Save Roster</button>
+
+    <!-- Export options modal -->
+    <div class="modal-bg" id="exportModal">
+      <div class="modal">
+        <h3>Export Data</h3>
+        <div class="hint" id="exportSummary" style="margin-bottom: 14px"></div>
+        <div class="export-options">
+          <button class="export-opt" id="expSave">
+            <span class="opt-title">💾 Save CSV file</span>
+            <span class="opt-sub">Download to this device</span>
+          </button>
+          <button class="export-opt" id="expGmail">
+            <span class="opt-title">✉️ Email via Gmail</span>
+            <span class="opt-sub">Opens Gmail compose with CSV pasted in</span>
+          </button>
+          <button class="export-opt" id="expSheets">
+            <span class="opt-title">📊 Send to Google Sheet</span>
+            <span class="opt-sub" id="expSheetsSub">Configure URL in Settings first</span>
+          </button>
+          <button class="export-opt" id="expShare" style="display: none">
+            <span class="opt-title">📤 Share…</span>
+            <span class="opt-sub">System share sheet</span>
+          </button>
+        </div>
+        <div class="modal-actions">
+          <button id="exportSettingsBtn">Settings</button>
+          <button id="exportCancel">Close</button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-<div class="toast" id="toast"></div>
+    <!-- Settings modal -->
+    <div class="modal-bg" id="settingsModal">
+      <div class="modal" style="max-width: 480px">
+        <h3>Settings</h3>
+        <label for="sheetUrl">Google Apps Script Web App URL</label>
+        <input
+          type="text"
+          id="sheetUrl"
+          inputmode="url"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="https://script.google.com/macros/s/.../exec"
+        />
+        <div class="hint" id="settingsHint" style="margin-top: 6px">
+          Paste the Web App URL from your deployed Apps Script.
+          <a href="#" id="howtoLink" style="color: var(--accent); text-decoration: underline"
+            >How to set this up</a
+          >
+        </div>
+        <label for="emailTo">Default email recipient (optional)</label>
+        <input
+          type="email"
+          id="emailTo"
+          inputmode="email"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="results@example.com"
+        />
+        <div class="hint">Used as the To: when emailing via Gmail.</div>
+        <div class="modal-actions">
+          <button id="settingsTest">Test Sheet URL</button>
+          <button id="settingsCancel">Cancel</button>
+          <button id="settingsSave" class="primary">Save</button>
+        </div>
+      </div>
+    </div>
 
-<script>
-'use strict';
+    <!-- How-to modal -->
+    <div class="modal-bg" id="howtoModal">
+      <div class="modal" style="max-width: 520px">
+        <h3>Google Sheets Setup</h3>
+        <div style="font-size: 13px; line-height: 1.55; color: var(--text)">
+          <p><strong>One-time setup</strong> (takes about 2 minutes):</p>
+          <ol style="padding-left: 20px">
+            <li>Open or create a Google Sheet.</li>
+            <li>Menu → <strong>Extensions → Apps Script</strong>.</li>
+            <li>
+              Delete the default code, paste the script (see <code>apps-script.js</code> file with
+              this app), save.
+            </li>
+            <li>
+              Click <strong>Deploy → New deployment</strong> → gear icon → <strong>Web app</strong>.
+            </li>
+            <li>
+              Set <em>Execute as</em>: <strong>Me</strong>, <em>Who has access</em>:
+              <strong>Anyone</strong>. Click Deploy.
+            </li>
+            <li>Authorize when prompted.</li>
+            <li>Copy the <strong>Web app URL</strong> and paste it into Settings.</li>
+          </ol>
+          <p style="color: var(--text-dim)">
+            Anyone with that URL can append rows to your sheet, so don't post it publicly. Each
+            "Send to Google Sheet" appends a tab with the timestamp; nothing is overwritten.
+          </p>
+        </div>
+        <div class="modal-actions">
+          <button id="howtoClose" class="primary">Got it</button>
+        </div>
+      </div>
+    </div>
 
-// ============ STATE ============
-const STORAGE_KEY = 'checkpoint.riders.v1';
-let riders = []; // [{ num, name, arrival, departure }]
-let editing = null; // { riderNum, field }
-const PRESS_MOVE_THRESHOLD_SQ = 100; // (10px)^2 — beyond this, treat press as a scroll/drag
+    <!-- Roster setup modal -->
+    <div class="modal-bg" id="rosterModal">
+      <div class="modal" style="max-width: 480px">
+        <h3>Roster Setup</h3>
+        <div class="hint" style="margin-bottom: 8px">
+          Pre-load riders. Numbers must be unique. Data persists offline.
+        </div>
+        <div class="roster-list" id="rosterList"></div>
+        <div class="modal-actions" style="justify-content: space-between">
+          <button id="rosterAdd">+ Add Rider</button>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap">
+            <button id="rosterImport">Import CSV</button>
+            <input type="file" id="rosterFile" accept=".csv,.txt" style="display: none" />
+            <button id="rosterClear" class="danger">Clear All</button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="rosterCancel">Cancel</button>
+          <button id="rosterSave" class="primary">Save Roster</button>
+        </div>
+      </div>
+    </div>
 
-// ============ DOM HELPERS ============
-const $ = id => document.getElementById(id);
-const showModal = id => $(id).classList.add('show');
-const hideModal = id => $(id).classList.remove('show');
+    <div class="toast" id="toast"></div>
 
-// ============ PERSISTENCE ============
-function loadRiders() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) riders = JSON.parse(raw) || [];
-  } catch { riders = []; }
-}
-function saveRiders() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(riders)); }
-  catch { toast('Storage error'); }
-}
+    <script>
+      'use strict';
 
-// ============ TIME UTILS ============
-const pad = n => n.toString().padStart(2, '0');
-const formatHM = d => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-const nowHMS = () => formatHM(new Date());
+      // ============ STATE ============
+      const STORAGE_KEY = 'checkpoint.riders.v1';
+      let riders = []; // [{ num, name, arrival, departure }]
+      let editing = null; // { riderNum, field }
+      const PRESS_MOVE_THRESHOLD_SQ = 100; // (10px)^2 — beyond this, treat press as a scroll/drag
 
-function tickClock() {
-  const d = new Date();
-  $('clock').textContent = formatHM(d);
-  // Reschedule on the next minute boundary instead of ticking once per second.
-  const msToNextMinute = 60000 - (d.getSeconds() * 1000 + d.getMilliseconds());
-  setTimeout(tickClock, msToNextMinute + 50);
-}
-tickClock();
+      // ============ DOM HELPERS ============
+      const $ = (id) => document.getElementById(id);
+      const showModal = (id) => $(id).classList.add('show');
+      const hideModal = (id) => $(id).classList.remove('show');
 
-// Parse user-entered time. Accepts: HH:MM, HMM, HHMM. Always returns HH:MM.
-function parseTime(input) {
-  if (!input) return null;
-  const s = input.trim();
-  if (!s) return null;
-  let h, m;
-  if (s.includes(':')) {
-    const parts = s.split(':').map(p => parseInt(p, 10));
-    if (parts.length < 2 || parts.slice(0, 2).some(isNaN)) return null;
-    h = parts[0]; m = parts[1];
-  } else {
-    const digits = s.replace(/[^0-9]/g, '');
-    if (digits.length === 3) { h = parseInt(digits.slice(0, 1), 10); m = parseInt(digits.slice(1, 3), 10); }
-    else if (digits.length === 4) { h = parseInt(digits.slice(0, 2), 10); m = parseInt(digits.slice(2, 4), 10); }
-    else return null;
-  }
-  if (isNaN(h) || isNaN(m)) return null;
-  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-  return pad(h) + ':' + pad(m);
-}
+      // ============ PERSISTENCE ============
+      function loadRiders() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) riders = JSON.parse(raw) || [];
+        } catch {
+          riders = [];
+        }
+      }
+      function saveRiders() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(riders));
+        } catch {
+          toast('Storage error');
+        }
+      }
 
-// ============ RENDERING ============
-const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-const escapeHTML = s => String(s).replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
+      // ============ TIME UTILS ============
+      const pad = (n) => n.toString().padStart(2, '0');
+      const formatHM = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      const nowHMS = () => formatHM(new Date());
 
-function render() {
-  const tbody = $('riderBody');
-  const hasRiders = riders.length > 0;
-  $('riderTable').style.display = hasRiders ? '' : 'none';
-  $('emptyState').style.display  = hasRiders ? 'none' : 'flex';
-  if (!hasRiders) return;
+      function tickClock() {
+        const d = new Date();
+        $('clock').textContent = formatHM(d);
+        // Reschedule on the next minute boundary instead of ticking once per second.
+        const msToNextMinute = 60000 - (d.getSeconds() * 1000 + d.getMilliseconds());
+        setTimeout(tickClock, msToNextMinute + 50);
+      }
+      tickClock();
 
-  tbody.innerHTML = riders.map(rowHTML).join('');
-  attachTimeHandlers();
-}
+      // Parse user-entered time. Accepts: HH:MM, HMM, HHMM. Always returns HH:MM.
+      function parseTime(input) {
+        if (!input) return null;
+        const s = input.trim();
+        if (!s) return null;
+        let h, m;
+        if (s.includes(':')) {
+          const parts = s.split(':').map((p) => parseInt(p, 10));
+          if (parts.length < 2 || parts.slice(0, 2).some(isNaN)) return null;
+          h = parts[0];
+          m = parts[1];
+        } else {
+          const digits = s.replace(/[^0-9]/g, '');
+          if (digits.length === 3) {
+            h = parseInt(digits.slice(0, 1), 10);
+            m = parseInt(digits.slice(1, 3), 10);
+          } else if (digits.length === 4) {
+            h = parseInt(digits.slice(0, 2), 10);
+            m = parseInt(digits.slice(2, 4), 10);
+          } else return null;
+        }
+        if (isNaN(h) || isNaN(m)) return null;
+        if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+        return pad(h) + ':' + pad(m);
+      }
 
-function rowHTML(r) {
-  const safeName = escapeHTML(r.name);
-  return `
+      // ============ RENDERING ============
+      const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+      const escapeHTML = (s) => String(s).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+
+      function render() {
+        const tbody = $('riderBody');
+        const hasRiders = riders.length > 0;
+        $('riderTable').style.display = hasRiders ? '' : 'none';
+        $('emptyState').style.display = hasRiders ? 'none' : 'flex';
+        if (!hasRiders) return;
+
+        tbody.innerHTML = riders.map(rowHTML).join('');
+        attachTimeHandlers();
+      }
+
+      function rowHTML(r) {
+        const safeName = escapeHTML(r.name);
+        return `
     <tr>
       <td class="num-cell">${r.num}</td>
       ${timeCellHTML(r, 'arrival')}
       ${timeCellHTML(r, 'departure')}
       <td class="name-cell" title="${safeName}">${safeName}</td>
     </tr>`;
-}
+      }
 
-function timeCellHTML(r, field) {
-  const val = r[field];
-  const cls = val ? `time-cell filled ${field}` : 'time-cell empty';
-  return `<td class="${cls}" data-num="${r.num}" data-field="${field}">${val || ''}</td>`;
-}
+      function timeCellHTML(r, field) {
+        const val = r[field];
+        const cls = val ? `time-cell filled ${field}` : 'time-cell empty';
+        return `<td class="${cls}" data-num="${r.num}" data-field="${field}">${val || ''}</td>`;
+      }
 
-// ============ CELL INTERACTION ============
-// Press state is stored on the cell itself (cell._press) so concurrent touches
-// on different cells don't clobber each other. pointerleave is intentionally NOT
-// used to cancel — it fires on minor finger drift (especially with gloves) and
-// would defeat long-press. Movement past PRESS_MOVE_THRESHOLD cancels instead.
-function attachTimeHandlers() {
-  document.querySelectorAll('.time-cell').forEach(cell => {
-    cell.addEventListener('pointerdown', onPressStart);
-    cell.addEventListener('pointerup', onPressEnd);
-    cell.addEventListener('pointermove', onPressMove);
-    cell.addEventListener('pointercancel', onPressCancel);
-    cell.addEventListener('contextmenu', e => e.preventDefault());
-  });
-}
+      // ============ CELL INTERACTION ============
+      // Press state is stored on the cell itself (cell._press) so concurrent touches
+      // on different cells don't clobber each other. pointerleave is intentionally NOT
+      // used to cancel — it fires on minor finger drift (especially with gloves) and
+      // would defeat long-press. Movement past PRESS_MOVE_THRESHOLD cancels instead.
+      function attachTimeHandlers() {
+        document.querySelectorAll('.time-cell').forEach((cell) => {
+          cell.addEventListener('pointerdown', onPressStart);
+          cell.addEventListener('pointerup', onPressEnd);
+          cell.addEventListener('pointermove', onPressMove);
+          cell.addEventListener('pointercancel', onPressCancel);
+          cell.addEventListener('contextmenu', (e) => e.preventDefault());
+        });
+      }
 
-function onPressStart(e) {
-  const cell = e.currentTarget;
-  cell._press = { startX: e.clientX, startY: e.clientY, triggered: false, timer: 0 };
-  cell._press.timer = setTimeout(() => {
-    cell._press.triggered = true;
-    openTimeModal(cell);
-  }, 550);
-}
-function onPressMove(e) {
-  const p = e.currentTarget._press;
-  if (!p) return;
-  const dx = e.clientX - p.startX;
-  const dy = e.clientY - p.startY;
-  if (dx * dx + dy * dy > PRESS_MOVE_THRESHOLD_SQ) {
-    clearTimeout(p.timer);
-    e.currentTarget._press = null;
-  }
-}
-function onPressEnd(e) {
-  const cell = e.currentTarget;
-  const p = cell._press;
-  if (!p) return;
-  clearTimeout(p.timer);
-  const wasLong = p.triggered;
-  cell._press = null;
-  if (wasLong) return;
-  // Only quick-tap to record on EMPTY cells. Filled cells require long-press to edit
-  // (prevents accidentally overwriting a recorded time).
-  if (!cell.classList.contains('empty')) return;
-  recordCurrentTime(cell);
-}
-function onPressCancel(e) {
-  const cell = e.currentTarget;
-  if (cell._press) { clearTimeout(cell._press.timer); cell._press = null; }
-}
+      function onPressStart(e) {
+        const cell = e.currentTarget;
+        cell._press = { startX: e.clientX, startY: e.clientY, triggered: false, timer: 0 };
+        cell._press.timer = setTimeout(() => {
+          cell._press.triggered = true;
+          openTimeModal(cell);
+        }, 550);
+      }
+      function onPressMove(e) {
+        const p = e.currentTarget._press;
+        if (!p) return;
+        const dx = e.clientX - p.startX;
+        const dy = e.clientY - p.startY;
+        if (dx * dx + dy * dy > PRESS_MOVE_THRESHOLD_SQ) {
+          clearTimeout(p.timer);
+          e.currentTarget._press = null;
+        }
+      }
+      function onPressEnd(e) {
+        const cell = e.currentTarget;
+        const p = cell._press;
+        if (!p) return;
+        clearTimeout(p.timer);
+        const wasLong = p.triggered;
+        cell._press = null;
+        if (wasLong) return;
+        // Only quick-tap to record on EMPTY cells. Filled cells require long-press to edit
+        // (prevents accidentally overwriting a recorded time).
+        if (!cell.classList.contains('empty')) return;
+        recordCurrentTime(cell);
+      }
+      function onPressCancel(e) {
+        const cell = e.currentTarget;
+        if (cell._press) {
+          clearTimeout(cell._press.timer);
+          cell._press = null;
+        }
+      }
 
-function recordCurrentTime(cell) {
-  const num = parseInt(cell.dataset.num, 10);
-  const field = cell.dataset.field;
-  const r = riders.find(x => x.num === num);
-  if (!r) return;
-  r[field] = nowHMS();
-  saveRiders();
-  // Render first so the new (filled) cell exists, then flash it. Flashing the old
-  // node would be wiped by the re-render mid-animation.
-  render();
-  const fresh = document.querySelector(
-    `.time-cell[data-num="${num}"][data-field="${field}"]`
-  );
-  if (fresh) fresh.classList.add('flash');
-}
+      function recordCurrentTime(cell) {
+        const num = parseInt(cell.dataset.num, 10);
+        const field = cell.dataset.field;
+        const r = riders.find((x) => x.num === num);
+        if (!r) return;
+        r[field] = nowHMS();
+        saveRiders();
+        // Render first so the new (filled) cell exists, then flash it. Flashing the old
+        // node would be wiped by the re-render mid-animation.
+        render();
+        const fresh = document.querySelector(
+          `.time-cell[data-num="${num}"][data-field="${field}"]`
+        );
+        if (fresh) fresh.classList.add('flash');
+      }
 
-function openTimeModal(cell) {
-  const num = parseInt(cell.dataset.num, 10);
-  const field = cell.dataset.field;
-  const r = riders.find(x => x.num === num);
-  if (!r) return;
-  editing = { num, field };
-  const label = field === 'arrival' ? 'Arrival' : 'Departure';
-  const suffix = r.name ? ` (${r.name})` : '';
-  $('timeModalTitle').textContent = `${label} — Rider #${num}${suffix}`;
-  const input = $('timeInput');
-  input.value = r[field] || '';
-  showModal('timeModal');
-  setTimeout(() => { input.focus(); input.select(); }, 50);
-}
+      function openTimeModal(cell) {
+        const num = parseInt(cell.dataset.num, 10);
+        const field = cell.dataset.field;
+        const r = riders.find((x) => x.num === num);
+        if (!r) return;
+        editing = { num, field };
+        const label = field === 'arrival' ? 'Arrival' : 'Departure';
+        const suffix = r.name ? ` (${r.name})` : '';
+        $('timeModalTitle').textContent = `${label} — Rider #${num}${suffix}`;
+        const input = $('timeInput');
+        input.value = r[field] || '';
+        showModal('timeModal');
+        setTimeout(() => {
+          input.focus();
+          input.select();
+        }, 50);
+      }
 
-function closeTimeModal() {
-  hideModal('timeModal');
-  editing = null;
-}
+      function closeTimeModal() {
+        hideModal('timeModal');
+        editing = null;
+      }
 
-// Set or clear the currently-edited cell's time. `parsed === ''` means clear.
-function commitEdit(parsed) {
-  if (!editing) return;
-  const r = riders.find(x => x.num === editing.num);
-  if (!r) return;
-  r[editing.field] = parsed;
-  saveRiders();
-  closeTimeModal();
-  render();
-}
+      // Set or clear the currently-edited cell's time. `parsed === ''` means clear.
+      function commitEdit(parsed) {
+        if (!editing) return;
+        const r = riders.find((x) => x.num === editing.num);
+        if (!r) return;
+        r[editing.field] = parsed;
+        saveRiders();
+        closeTimeModal();
+        render();
+      }
 
-$('timeCancel').addEventListener('click', closeTimeModal);
-$('timeSave').addEventListener('click', () => {
-  const val = $('timeInput').value.trim();
-  if (!val)            { toast('To clear, use the Clear button'); return; }
-  const parsed = parseTime(val);
-  if (!parsed)         { toast('Invalid time format'); return; }
-  commitEdit(parsed);
-});
-$('timeClear').addEventListener('click', () => commitEdit(''));
-$('timeInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter')  $('timeSave').click();
-  if (e.key === 'Escape') closeTimeModal();
-});
+      $('timeCancel').addEventListener('click', closeTimeModal);
+      $('timeSave').addEventListener('click', () => {
+        const val = $('timeInput').value.trim();
+        if (!val) {
+          toast('To clear, use the Clear button');
+          return;
+        }
+        const parsed = parseTime(val);
+        if (!parsed) {
+          toast('Invalid time format');
+          return;
+        }
+        commitEdit(parsed);
+      });
+      $('timeClear').addEventListener('click', () => commitEdit(''));
+      $('timeInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') $('timeSave').click();
+        if (e.key === 'Escape') closeTimeModal();
+      });
 
-// ============ ROSTER SETUP ============
-function openRosterModal() {
-  $('rosterList').innerHTML = '';
-  if (riders.length === 0) addRosterRow(1, '');
-  else riders.forEach(r => addRosterRow(r.num, r.name));
-  showModal('rosterModal');
-}
-const closeRosterModal = () => hideModal('rosterModal');
-function addRosterRow(num, name) {
-  const row = document.createElement('div');
-  row.className = 'roster-row';
-  row.innerHTML = `
+      // ============ ROSTER SETUP ============
+      function openRosterModal() {
+        $('rosterList').innerHTML = '';
+        if (riders.length === 0) addRosterRow(1, '');
+        else riders.forEach((r) => addRosterRow(r.num, r.name));
+        showModal('rosterModal');
+      }
+      const closeRosterModal = () => hideModal('rosterModal');
+      function addRosterRow(num, name) {
+        const row = document.createElement('div');
+        row.className = 'roster-row';
+        row.innerHTML = `
     <input class="num" type="number" min="1" value="${num || ''}" placeholder="#">
     <input class="nm" type="text" value="${escapeHTML(name || '')}" placeholder="Rider name">
     <button class="danger remove">×</button>`;
-  row.querySelector('.remove').addEventListener('click', () => row.remove());
-  $('rosterList').appendChild(row);
-}
+        row.querySelector('.remove').addEventListener('click', () => row.remove());
+        $('rosterList').appendChild(row);
+      }
 
-$('setupBtn').addEventListener('click', openRosterModal);
-$('setupBtn2').addEventListener('click', openRosterModal);
-$('rosterCancel').addEventListener('click', closeRosterModal);
+      $('setupBtn').addEventListener('click', openRosterModal);
+      $('setupBtn2').addEventListener('click', openRosterModal);
+      $('rosterCancel').addEventListener('click', closeRosterModal);
 
-$('rosterAdd').addEventListener('click', () => {
-  // Suggest next sequential number
-  const nums = Array.from($('rosterList').querySelectorAll('input.num'))
-    .map(i => parseInt(i.value, 10))
-    .filter(n => !isNaN(n));
-  const next = nums.length ? Math.max(...nums) + 1 : 1;
-  addRosterRow(next, '');
-});
+      $('rosterAdd').addEventListener('click', () => {
+        // Suggest next sequential number
+        const nums = Array.from($('rosterList').querySelectorAll('input.num'))
+          .map((i) => parseInt(i.value, 10))
+          .filter((n) => !isNaN(n));
+        const next = nums.length ? Math.max(...nums) + 1 : 1;
+        addRosterRow(next, '');
+      });
 
-$('rosterClear').addEventListener('click', () => {
-  if (!confirm('Clear all riders AND all recorded times? This cannot be undone.')) return;
-  riders = [];
-  saveRiders();
-  closeRosterModal();
-  render();
-});
+      $('rosterClear').addEventListener('click', () => {
+        if (!confirm('Clear all riders AND all recorded times? This cannot be undone.')) return;
+        riders = [];
+        saveRiders();
+        closeRosterModal();
+        render();
+      });
 
-$('rosterSave').addEventListener('click', () => {
-  const rows = document.querySelectorAll('#rosterList .roster-row');
-  const newRoster = [];
-  const seenNums = new Set();
-  let skipped = 0;
-  for (const row of rows) {
-    const num = parseInt(row.querySelector('.num').value, 10);
-    const name = row.querySelector('.nm').value.trim();
-    if (isNaN(num) || num < 1) { skipped++; continue; }
-    if (seenNums.has(num))     { toast(`Duplicate rider #${num}`); return; }
-    seenNums.add(num);
-    // Preserve existing times if this rider was already in the roster.
-    const prev = riders.find(r => r.num === num);
-    newRoster.push({
-      num, name,
-      arrival:   prev ? prev.arrival   : '',
-      departure: prev ? prev.departure : ''
-    });
-  }
-  newRoster.sort((a, b) => a.num - b.num);
-  riders = newRoster;
-  saveRiders();
-  closeRosterModal();
-  render();
-  const plural = riders.length === 1 ? '' : 's';
-  const tail = skipped ? ` (skipped ${skipped} invalid)` : '';
-  toast(`Saved ${riders.length} rider${plural}${tail}`);
-});
+      $('rosterSave').addEventListener('click', () => {
+        const rows = document.querySelectorAll('#rosterList .roster-row');
+        const newRoster = [];
+        const seenNums = new Set();
+        let skipped = 0;
+        for (const row of rows) {
+          const num = parseInt(row.querySelector('.num').value, 10);
+          const name = row.querySelector('.nm').value.trim();
+          if (isNaN(num) || num < 1) {
+            skipped++;
+            continue;
+          }
+          if (seenNums.has(num)) {
+            toast(`Duplicate rider #${num}`);
+            return;
+          }
+          seenNums.add(num);
+          // Preserve existing times if this rider was already in the roster.
+          const prev = riders.find((r) => r.num === num);
+          newRoster.push({
+            num,
+            name,
+            arrival: prev ? prev.arrival : '',
+            departure: prev ? prev.departure : '',
+          });
+        }
+        newRoster.sort((a, b) => a.num - b.num);
+        riders = newRoster;
+        saveRiders();
+        closeRosterModal();
+        render();
+        const plural = riders.length === 1 ? '' : 's';
+        const tail = skipped ? ` (skipped ${skipped} invalid)` : '';
+        toast(`Saved ${riders.length} rider${plural}${tail}`);
+      });
 
-// CSV import for roster
-// Parses one CSV line, handling quoted fields with embedded commas and "" escapes.
-function parseCSVLine(line) {
-  const out = [];
-  let cur = '';
-  let inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (inQ) {
-      if (c === '"') {
-        if (line[i + 1] === '"') { cur += '"'; i++; }
-        else { inQ = false; }
-      } else cur += c;
-    } else if (c === ',') { out.push(cur); cur = ''; }
-    else if (c === '"' && cur === '') { inQ = true; }
-    else cur += c;
-  }
-  out.push(cur);
-  return out;
-}
+      // CSV import for roster
+      // Parses one CSV line, handling quoted fields with embedded commas and "" escapes.
+      function parseCSVLine(line) {
+        const out = [];
+        let cur = '';
+        let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const c = line[i];
+          if (inQ) {
+            if (c === '"') {
+              if (line[i + 1] === '"') {
+                cur += '"';
+                i++;
+              } else {
+                inQ = false;
+              }
+            } else cur += c;
+          } else if (c === ',') {
+            out.push(cur);
+            cur = '';
+          } else if (c === '"' && cur === '') {
+            inQ = true;
+          } else cur += c;
+        }
+        out.push(cur);
+        return out;
+      }
 
-$('rosterImport').addEventListener('click', () => $('rosterFile').click());
+      $('rosterImport').addEventListener('click', () => $('rosterFile').click());
 
-$('rosterFile').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
-    $('rosterList').innerHTML = '';
-    let added = 0;
-    lines.forEach((line, idx) => {
-      const parts = parseCSVLine(line);
-      // Skip a header row whose first column is non-numeric (e.g. "Number,Name").
-      if (idx === 0 && /[a-zA-Z]/.test(parts[0] || '')) return;
-      const num = parseInt(parts[0], 10);
-      if (isNaN(num)) return;
-      addRosterRow(num, (parts[1] || '').trim());
-      added++;
-    });
-    if (added === 0) addRosterRow(1, '');
-    toast(`Imported ${added} rows`);
-    e.target.value = '';
-  };
-  reader.readAsText(file);
-});
+      $('rosterFile').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const lines = ev.target.result.split(/\r?\n/).filter((l) => l.trim());
+          $('rosterList').innerHTML = '';
+          let added = 0;
+          lines.forEach((line, idx) => {
+            const parts = parseCSVLine(line);
+            // Skip a header row whose first column is non-numeric (e.g. "Number,Name").
+            if (idx === 0 && /[a-zA-Z]/.test(parts[0] || '')) return;
+            const num = parseInt(parts[0], 10);
+            if (isNaN(num)) return;
+            addRosterRow(num, (parts[1] || '').trim());
+            added++;
+          });
+          if (added === 0) addRosterRow(1, '');
+          toast(`Imported ${added} rows`);
+          e.target.value = '';
+        };
+        reader.readAsText(file);
+      });
 
-// ============ EXPORT ============
-const SETTINGS_KEY = 'checkpoint.settings.v1';
-let settings = { sheetUrl: '', emailTo: '' };
+      // ============ EXPORT ============
+      const SETTINGS_KEY = 'checkpoint.settings.v1';
+      let settings = { sheetUrl: '', emailTo: '' };
 
-function loadSettings() {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) settings = Object.assign(settings, JSON.parse(raw) || {});
-  } catch { /* ignore */ }
-}
-function saveSettings() {
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
-  catch { toast('Storage error'); }
-}
+      function loadSettings() {
+        try {
+          const raw = localStorage.getItem(SETTINGS_KEY);
+          if (raw) settings = Object.assign(settings, JSON.parse(raw) || {});
+        } catch {
+          /* ignore */
+        }
+      }
+      function saveSettings() {
+        try {
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        } catch {
+          toast('Storage error');
+        }
+      }
 
-function buildCSV() {
-  const rows = [['Number', 'Name', 'Arrival', 'Departure']];
-  riders.forEach(r => rows.push([r.num, r.name, r.arrival, r.departure]));
-  return rows.map(row =>
-    row.map(cell => {
-      let s = String(cell == null ? '' : cell);
-      // CSV-injection guard: spreadsheets evaluate cells starting with these as formulas.
-      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-    }).join(',')
-  ).join('\n');
-}
+      function buildCSV() {
+        const rows = [['Number', 'Name', 'Arrival', 'Departure']];
+        riders.forEach((r) => rows.push([r.num, r.name, r.arrival, r.departure]));
+        return rows
+          .map((row) =>
+            row
+              .map((cell) => {
+                let s = String(cell == null ? '' : cell);
+                // CSV-injection guard: spreadsheets evaluate cells starting with these as formulas.
+                if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+              })
+              .join(',')
+          )
+          .join('\n');
+      }
 
-function exportFilename() {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return `checkpoint-${stamp}.csv`;
-}
+      function exportFilename() {
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        return `checkpoint-${stamp}.csv`;
+      }
 
-const SHEET_FETCH_TIMEOUT_MS = 15000;
-const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-const closeExportModal = () => hideModal('exportModal');
+      const SHEET_FETCH_TIMEOUT_MS = 15000;
+      const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const closeExportModal = () => hideModal('exportModal');
 
-// --- Open the export menu ---
-function openExportMenu() {
-  if (riders.length === 0) { toast('No data to export'); return; }
+      // --- Open the export menu ---
+      function openExportMenu() {
+        if (riders.length === 0) {
+          toast('No data to export');
+          return;
+        }
 
-  const filled = riders.filter(r => r.arrival || r.departure).length;
-  const plural = riders.length === 1 ? '' : 's';
-  $('exportSummary').textContent =
-    `${riders.length} rider${plural} • ${filled} with recorded times`;
+        const filled = riders.filter((r) => r.arrival || r.departure).length;
+        const plural = riders.length === 1 ? '' : 's';
+        $('exportSummary').textContent =
+          `${riders.length} rider${plural} • ${filled} with recorded times`;
 
-  configureSheetsButton();
+        configureSheetsButton();
 
-  // Show the system-share option only on mobile (desktop share sheets are poor).
-  $('expShare').style.display = (IS_MOBILE && navigator.canShare) ? '' : 'none';
+        // Show the system-share option only on mobile (desktop share sheets are poor).
+        $('expShare').style.display = IS_MOBILE && navigator.canShare ? '' : 'none';
 
-  // Reset any prior status colors from earlier sync attempts.
-  document.querySelectorAll('.export-opt')
-    .forEach(b => b.classList.remove('busy', 'success', 'error'));
+        // Reset any prior status colors from earlier sync attempts.
+        document
+          .querySelectorAll('.export-opt')
+          .forEach((b) => b.classList.remove('busy', 'success', 'error'));
 
-  showModal('exportModal');
-}
+        showModal('exportModal');
+      }
 
-function configureSheetsButton() {
-  const btn = $('expSheets');
-  const sub = $('expSheetsSub');
-  if (!settings.sheetUrl) {
-    btn.disabled = true;
-    sub.textContent = 'Configure URL in Settings first';
-    return;
-  }
-  btn.disabled = false;
-  try { sub.textContent = `Append to ${new URL(settings.sheetUrl).hostname}`; }
-  catch { sub.textContent = 'Append a new tab to your sheet'; }
-}
+      function configureSheetsButton() {
+        const btn = $('expSheets');
+        const sub = $('expSheetsSub');
+        if (!settings.sheetUrl) {
+          btn.disabled = true;
+          sub.textContent = 'Configure URL in Settings first';
+          return;
+        }
+        btn.disabled = false;
+        try {
+          sub.textContent = `Append to ${new URL(settings.sheetUrl).hostname}`;
+        } catch {
+          sub.textContent = 'Append a new tab to your sheet';
+        }
+      }
 
-// --- Save file ---
-function saveCSVFile() {
-  const filename = exportFilename();
-  const blob = new Blob([buildCSV()], { type: 'text/csv;charset=utf-8' });
-  triggerDownload(blob, filename);
-  closeExportModal();
-  toast(`Saved ${filename}`);
-}
+      // --- Save file ---
+      function saveCSVFile() {
+        const filename = exportFilename();
+        const blob = new Blob([buildCSV()], { type: 'text/csv;charset=utf-8' });
+        triggerDownload(blob, filename);
+        closeExportModal();
+        toast(`Saved ${filename}`);
+      }
 
-// --- Email via Gmail ---
-function emailViaGmail() {
-  const csv = buildCSV();
-  const now = new Date();
-  const subject = `Checkpoint export ${now.toLocaleString()}`;
-  // Body: a small header followed by inline CSV. Gmail can paste it as-is.
-  const body =
-    `Checkpoint data export\n${now.toString()}\nRiders: ${riders.length}\n\n${csv}`;
-  // Gmail web compose URL — works on desktop and falls back gracefully on mobile.
-  const url =
-    'https://mail.google.com/mail/?view=cm&fs=1' +
-    `&to=${encodeURIComponent(settings.emailTo || '')}` +
-    `&su=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(body)}`;
-  window.open(url, '_blank', 'noopener');
-  closeExportModal();
-}
+      // --- Email via Gmail ---
+      function emailViaGmail() {
+        const csv = buildCSV();
+        const now = new Date();
+        const subject = `Checkpoint export ${now.toLocaleString()}`;
+        // Body: a small header followed by inline CSV. Gmail can paste it as-is.
+        const body = `Checkpoint data export\n${now.toString()}\nRiders: ${riders.length}\n\n${csv}`;
+        // Gmail web compose URL — works on desktop and falls back gracefully on mobile.
+        const url =
+          'https://mail.google.com/mail/?view=cm&fs=1' +
+          `&to=${encodeURIComponent(settings.emailTo || '')}` +
+          `&su=${encodeURIComponent(subject)}` +
+          `&body=${encodeURIComponent(body)}`;
+        window.open(url, '_blank', 'noopener');
+        closeExportModal();
+      }
 
-// --- Send to Google Sheet ---
-async function syncToSheet() {
-  if (!settings.sheetUrl) { toast('Set Sheet URL in Settings'); return; }
-  const btn = $('expSheets');
-  btn.classList.remove('success', 'error');
-  btn.classList.add('busy');
-  btn.disabled = true;
+      // --- Send to Google Sheet ---
+      async function syncToSheet() {
+        if (!settings.sheetUrl) {
+          toast('Set Sheet URL in Settings');
+          return;
+        }
+        const btn = $('expSheets');
+        btn.classList.remove('success', 'error');
+        btn.classList.add('busy');
+        btn.disabled = true;
 
-  const ctrl = new AbortController();
-  const timeoutId = setTimeout(() => ctrl.abort(), SHEET_FETCH_TIMEOUT_MS);
-  try {
-    const payload = {
-      sentAt: new Date().toISOString(),
-      device: navigator.userAgent || '',
-      riders: riders.map(r => ({
-        num: r.num, name: r.name, arrival: r.arrival, departure: r.departure
-      }))
-    };
-    // Apps Script web apps require text/plain to avoid a CORS preflight.
-    const resp = await fetch(settings.sheetUrl, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload),
-      redirect: 'follow',
-      signal: ctrl.signal
-    });
-    let result = null;
-    try { result = await resp.json(); } catch { /* non-JSON response */ }
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), SHEET_FETCH_TIMEOUT_MS);
+        try {
+          const payload = {
+            sentAt: new Date().toISOString(),
+            device: navigator.userAgent || '',
+            riders: riders.map((r) => ({
+              num: r.num,
+              name: r.name,
+              arrival: r.arrival,
+              departure: r.departure,
+            })),
+          };
+          // Apps Script web apps require text/plain to avoid a CORS preflight.
+          const resp = await fetch(settings.sheetUrl, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload),
+            redirect: 'follow',
+            signal: ctrl.signal,
+          });
+          let result = null;
+          try {
+            result = await resp.json();
+          } catch {
+            /* non-JSON response */
+          }
 
-    if (!resp.ok || !result || !result.ok) {
-      throw new Error((result && result.error) || `HTTP ${resp.status}`);
-    }
-    btn.classList.replace('busy', 'success');
-    toast(`Synced to Sheet (${result.rows} rows, tab "${result.tab}")`);
-    setTimeout(closeExportModal, 700);
-  } catch (e) {
-    btn.classList.replace('busy', 'error');
-    const reason = e.name === 'AbortError' ? 'timed out' : e.message;
-    toast(`Sync failed: ${reason}`);
-  } finally {
-    clearTimeout(timeoutId);
-    btn.disabled = false;
-  }
-}
+          if (!resp.ok || !result || !result.ok) {
+            throw new Error((result && result.error) || `HTTP ${resp.status}`);
+          }
+          btn.classList.replace('busy', 'success');
+          toast(`Synced to Sheet (${result.rows} rows, tab "${result.tab}")`);
+          setTimeout(closeExportModal, 700);
+        } catch (e) {
+          btn.classList.replace('busy', 'error');
+          const reason = e.name === 'AbortError' ? 'timed out' : e.message;
+          toast(`Sync failed: ${reason}`);
+        } finally {
+          clearTimeout(timeoutId);
+          btn.disabled = false;
+        }
+      }
 
-// --- System share (mobile only) ---
-function shareViaSystem() {
-  const filename = exportFilename();
-  const blob = new Blob([buildCSV()], { type: 'text/csv;charset=utf-8' });
-  const file = new File([blob], filename, { type: 'text/csv' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    navigator.share({ files: [file], title: 'Checkpoint Export' })
-      .then(closeExportModal)
-      .catch(() => { /* user cancelled */ });
-  } else {
-    triggerDownload(blob, filename);
-    closeExportModal();
-  }
-}
+      // --- System share (mobile only) ---
+      function shareViaSystem() {
+        const filename = exportFilename();
+        const blob = new Blob([buildCSV()], { type: 'text/csv;charset=utf-8' });
+        const file = new File([blob], filename, { type: 'text/csv' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator
+            .share({ files: [file], title: 'Checkpoint Export' })
+            .then(closeExportModal)
+            .catch(() => {
+              /* user cancelled */
+            });
+        } else {
+          triggerDownload(blob, filename);
+          closeExportModal();
+        }
+      }
 
-function triggerDownload(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 100);
-}
+      function triggerDownload(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+      }
 
-$('exportBtn').addEventListener('click', openExportMenu);
-$('exportCancel').addEventListener('click', closeExportModal);
-$('expSave').addEventListener('click', saveCSVFile);
-$('expGmail').addEventListener('click', emailViaGmail);
-$('expSheets').addEventListener('click', syncToSheet);
-$('expShare').addEventListener('click', shareViaSystem);
+      $('exportBtn').addEventListener('click', openExportMenu);
+      $('exportCancel').addEventListener('click', closeExportModal);
+      $('expSave').addEventListener('click', saveCSVFile);
+      $('expGmail').addEventListener('click', emailViaGmail);
+      $('expSheets').addEventListener('click', syncToSheet);
+      $('expShare').addEventListener('click', shareViaSystem);
 
-// ============ SETTINGS ============
-const APPS_SCRIPT_URL_RE = /^https:\/\/script\.google\.com\//;
+      // ============ SETTINGS ============
+      const APPS_SCRIPT_URL_RE = /^https:\/\/script\.google\.com\//;
 
-function openSettings() {
-  $('sheetUrl').value = settings.sheetUrl || '';
-  $('emailTo').value  = settings.emailTo  || '';
-  showModal('settingsModal');
-}
+      function openSettings() {
+        $('sheetUrl').value = settings.sheetUrl || '';
+        $('emailTo').value = settings.emailTo || '';
+        showModal('settingsModal');
+      }
 
-function saveSettingsFromForm() {
-  const url   = $('sheetUrl').value.trim();
-  const email = $('emailTo').value.trim();
-  if (url && !APPS_SCRIPT_URL_RE.test(url)) {
-    const ok = confirm("That URL doesn't look like a Google Apps Script Web App URL. Save it anyway?");
-    if (!ok) return;
-  }
-  settings.sheetUrl = url;
-  settings.emailTo  = email;
-  saveSettings();
-  hideModal('settingsModal');
-  toast('Settings saved');
-}
+      function saveSettingsFromForm() {
+        const url = $('sheetUrl').value.trim();
+        const email = $('emailTo').value.trim();
+        if (url && !APPS_SCRIPT_URL_RE.test(url)) {
+          const ok = confirm(
+            "That URL doesn't look like a Google Apps Script Web App URL. Save it anyway?"
+          );
+          if (!ok) return;
+        }
+        settings.sheetUrl = url;
+        settings.emailTo = email;
+        saveSettings();
+        hideModal('settingsModal');
+        toast('Settings saved');
+      }
 
-async function testSheetUrl() {
-  const url = $('sheetUrl').value.trim();
-  if (!url) { toast('Paste a URL first'); return; }
-  toast('Testing…');
-  const ctrl = new AbortController();
-  const timeoutId = setTimeout(() => ctrl.abort(), SHEET_FETCH_TIMEOUT_MS);
-  try {
-    const resp = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ test: true }),
-      signal: ctrl.signal
-    });
-    const result = await resp.json();
-    toast(result && result.ok ? '✓ Sheet connection OK' : 'Reached, but unexpected response');
-  } catch (e) {
-    const reason = e.name === 'AbortError' ? 'timed out' : e.message;
-    toast(`Test failed: ${reason}`);
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
+      async function testSheetUrl() {
+        const url = $('sheetUrl').value.trim();
+        if (!url) {
+          toast('Paste a URL first');
+          return;
+        }
+        toast('Testing…');
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), SHEET_FETCH_TIMEOUT_MS);
+        try {
+          const resp = await fetch(url, {
+            method: 'POST',
+            mode: 'cors',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ test: true }),
+            signal: ctrl.signal,
+          });
+          const result = await resp.json();
+          toast(result && result.ok ? '✓ Sheet connection OK' : 'Reached, but unexpected response');
+        } catch (e) {
+          const reason = e.name === 'AbortError' ? 'timed out' : e.message;
+          toast(`Test failed: ${reason}`);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
 
-$('exportSettingsBtn').addEventListener('click', openSettings);
-$('settingsCancel').addEventListener('click', () => hideModal('settingsModal'));
-$('settingsSave').addEventListener('click', saveSettingsFromForm);
-$('settingsTest').addEventListener('click', testSheetUrl);
-$('howtoLink').addEventListener('click', e => { e.preventDefault(); showModal('howtoModal'); });
-$('howtoClose').addEventListener('click', () => hideModal('howtoModal'));
+      $('exportSettingsBtn').addEventListener('click', openSettings);
+      $('settingsCancel').addEventListener('click', () => hideModal('settingsModal'));
+      $('settingsSave').addEventListener('click', saveSettingsFromForm);
+      $('settingsTest').addEventListener('click', testSheetUrl);
+      $('howtoLink').addEventListener('click', (e) => {
+        e.preventDefault();
+        showModal('howtoModal');
+      });
+      $('howtoClose').addEventListener('click', () => hideModal('howtoModal'));
 
-// ============ TOAST ============
-let toastTimer = null;
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
-}
+      // ============ TOAST ============
+      let toastTimer = null;
+      function toast(msg) {
+        const t = $('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+      }
 
-// ============ SERVICE WORKER ============
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* offline still works after first load */ });
-  });
-}
+      // ============ SERVICE WORKER ============
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch(() => {
+            /* offline still works after first load */
+          });
+        });
+      }
 
-// Prevent pinch-zoom interfering with long-press
-document.addEventListener('gesturestart', e => e.preventDefault());
+      // Prevent pinch-zoom interfering with long-press
+      document.addEventListener('gesturestart', (e) => e.preventDefault());
 
-// ============ INIT ============
-loadSettings();
-loadRiders();
-render();
-</script>
-</body>
+      // ============ INIT ============
+      loadSettings();
+      loadRiders();
+      render();
+    </script>
+  </body>
 </html>
