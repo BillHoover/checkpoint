@@ -511,11 +511,11 @@ function loadRiders() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) riders = JSON.parse(raw) || [];
-  } catch (e) { riders = []; }
+  } catch { riders = []; }
 }
 function saveRiders() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(riders)); }
-  catch (e) { toast('Storage error'); }
+  catch { toast('Storage error'); }
 }
 
 // ============ TIME UTILS ============
@@ -821,11 +821,11 @@ function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (raw) settings = Object.assign(settings, JSON.parse(raw) || {});
-  } catch (e) { /* ignore */ }
+  } catch { /* ignore */ }
 }
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
-  catch (e) { toast('Storage error'); }
+  catch { toast('Storage error'); }
 }
 
 function buildCSV() {
@@ -881,7 +881,7 @@ function configureSheetsButton() {
   }
   btn.disabled = false;
   try { sub.textContent = `Append to ${new URL(settings.sheetUrl).hostname}`; }
-  catch (e) { sub.textContent = 'Append a new tab to your sheet'; }
+  catch { sub.textContent = 'Append a new tab to your sheet'; }
 }
 
 // --- Save file ---
@@ -939,7 +939,7 @@ async function syncToSheet() {
       signal: ctrl.signal
     });
     let result = null;
-    try { result = await resp.json(); } catch (e) { /* non-JSON response */ }
+    try { result = await resp.json(); } catch { /* non-JSON response */ }
 
     if (!resp.ok || !result || !result.ok) {
       throw new Error((result && result.error) || `HTTP ${resp.status}`);
