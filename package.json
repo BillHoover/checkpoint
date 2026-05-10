@@ -1,0 +1,21 @@
+{
+  "name": "checkpoint-dev-tools",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Dev-only tooling for the Checkpoint PWA. The app itself ships zero npm runtime dependencies; everything here is dev-time only (formatter, linter, dev HTTPS server, virtual-radio relay for testing radio sync without a real radio).",
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write \"index.html\" \"sw.js\" \"manifest.json\" \"tools/**/*.{js,mjs,json}\"",
+    "format:check": "prettier --check \"index.html\" \"sw.js\" \"manifest.json\" \"tools/**/*.{js,mjs,json}\"",
+    "lint": "eslint index.html sw.js tools",
+    "serve": "node tools/serve.mjs",
+    "virtual-radio": "node tools/virtual-radio.mjs"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "eslint-plugin-html": "^8.1.0",
+    "globals": "^15.0.0",
+    "prettier": "^3.4.0",
+    "ws": "^8.18.0"
+  }
+}
