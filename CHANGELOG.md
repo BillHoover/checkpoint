@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — 2026-05-10 — Radio sync (paste-bridge MVP)
+
+- **Radio Sync** panel — new top-level button in the header. Operators paste pending events into their radio software (Winlink, JS8Call, APRS messaging, …) and paste received frames back into the app. Frames are compact ASCII (≤ 67 chars to fit an APRS message), printable, and human-readable on a radio screen.
+- Wire format implemented per `RADIO-SYNC.md` v1: `CKPT/1` magic, CRC-16-CCITT, mandatory `D=YYYYMMDD` date headers, kind letters `A` `D` `Z` `Y` (timed) and `R` (roster), `/d±1` per-event day offsets for cross-midnight events, per-event stop overrides.
+- **Outbound queue** auto-composes minimal frame set covering events recorded since the last *Mark sent*. **Inbound** textbox accepts pasted frames and applies them — dedupe by `(origin, seq)`, gap-safe via per-origin pending buffer.
+- **Roster sync over radio** — *Broadcast Roster* button emits an `R` event per rider; receivers update their local roster on apply.
+- **Device-id collision detection** (mandatory per design §6.5). When an inbound event has the same `(origin, seq)` as a local event but different content, the inbound is quarantined into a `collisions` list and a red banner appears in the Radio panel until the operator dismisses it.
+- **Save event log (CSV)** — new fifth Export option produces the raw append-only log (`origin, seq, recordedAt, kind, rider, stop, hhmm, name`) for post-event audit or replay into a fresh device.
+- Service worker cache bumped to `checkpoint-v4`.
+
 ## 0.2.0 — 2026-05-10 — Multi-stop refactor
 
 - One app instance now tracks multiple checkpoints. Configure stops in **Settings → Stops**; pick "My stop" as the one this device records for. Other stops are visible (read-only) via the **Viewing** dropdown that appears in a sub-header strip when more than one stop is configured.

@@ -57,10 +57,24 @@ After loading the page once, it runs **fully offline** — even airplane mode.
 
 The **Export** button opens a menu with these options:
 
-- **💾 Save CSV file** — downloads to the device.
+- **💾 Save CSV file** — downloads to the device. Filename includes the currently-selected stop's name.
 - **✉️ Email via Gmail** — opens a Gmail compose window with the CSV in the body and (optionally) a default recipient pre-filled. Works on any platform.
 - **📊 Send to Google Sheet** — appends a new dated tab to a Google Sheet you've configured. Requires one-time setup (below).
+- **🗒 Save event log (CSV)** — the raw append-only event log (one row per A/D/Z/Y/R event). Useful for post-event audit, debugging, or replaying a session into a fresh device.
 - **📤 Share…** — system share sheet (mobile only).
+
+## Radio sync
+
+Tap **Radio** in the header to open the sync panel. The app speaks a small ASCII frame format intended for amateur radio — typical frames fit a single APRS message (67 chars). The transport is **paste-bridge**: copy outbound frames into your radio software (Winlink, JS8Call, APRS messaging) and paste received frames back into the app. Each frame is dedup'd and applied to the local event log; conflicting (`origin, seq`) pairs are quarantined and surfaced as a red banner.
+
+To enable a multi-device event:
+
+1. Each operator sets a unique **My device id** in Settings → Advanced (1–99). Coordinate ids during the pre-event briefing.
+2. Configure the same **Stops** list on every device, with matching ids.
+3. During the event, after recording new times, open **Radio**, copy the outbound frame(s), transmit, and tap **Mark sent**.
+4. When you receive a frame from a peer, paste it into Inbound and tap **Apply**.
+
+Roster names can be sync'd by tapping **Broadcast Roster** — this emits a roster-bind event per rider. See `RADIO-SYNC.md` for the protocol design and `MULTI-STOP.md` for the underlying multi-checkpoint data model.
 
 ## Google Sheets sync setup (optional, ~2 minutes one-time)
 

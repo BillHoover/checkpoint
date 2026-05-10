@@ -523,6 +523,77 @@
         font-size: 16px;
       }
 
+      /* Radio sync modal */
+      .radio-frame-box {
+        width: 100%;
+        padding: 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: 'SF Mono', Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        resize: vertical;
+        margin-top: 4px;
+      }
+      .radio-frame-box:focus {
+        outline: 2px solid var(--accent);
+        border-color: var(--accent);
+      }
+      .radio-collision-banner {
+        background: var(--danger);
+        color: white;
+        padding: 10px 12px;
+        border-radius: 6px;
+        margin-bottom: 12px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+      .radio-collision-banner button {
+        background: rgba(0, 0, 0, 0.25);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        margin-left: 8px;
+        font-size: 12px;
+        padding: 4px 8px;
+        min-height: auto;
+      }
+      .radio-peers {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        max-height: 120px;
+        overflow-y: auto;
+        margin-top: 4px;
+      }
+      .radio-peer-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+        font-size: 12px;
+        border-bottom: 1px solid var(--border);
+        font-variant-numeric: tabular-nums;
+      }
+      .radio-peer-row:last-child {
+        border-bottom: none;
+      }
+      .radio-peer-row .peer-id {
+        font-weight: 700;
+        color: var(--accent);
+        min-width: 48px;
+      }
+      .radio-peer-row .peer-meta {
+        color: var(--text-dim);
+        flex: 1;
+      }
+      .radio-empty {
+        padding: 10px 12px;
+        font-size: 12px;
+        color: var(--text-dim);
+        text-align: center;
+      }
+
       /* Settings — Advanced collapsible section */
       .advanced {
         margin-top: 16px;
@@ -557,6 +628,7 @@
       <div class="title">Checkpoint</div>
       <div class="clock" id="clock">--:--</div>
       <div class="actions">
+        <button id="radioBtn" title="Radio sync">Radio</button>
         <button id="setupBtn" title="Roster setup">Roster</button>
         <button id="exportBtn" class="primary" title="Export options">Export ▾</button>
       </div>
@@ -637,6 +709,12 @@
           <button class="export-opt" id="expSheets">
             <span class="opt-title">📊 Send to Google Sheet</span>
             <span class="opt-sub" id="expSheetsSub">Configure URL in Settings first</span>
+          </button>
+          <button class="export-opt" id="expEventLog">
+            <span class="opt-title">🗒 Save event log (CSV)</span>
+            <span class="opt-sub"
+              >Raw append-only log: origin, seq, kind, rider, stop, hhmm, name</span
+            >
           </button>
           <button class="export-opt" id="expShare" style="display: none">
             <span class="opt-title">📤 Share…</span>
@@ -783,6 +861,53 @@
       </div>
     </div>
 
+    <!-- Radio sync modal -->
+    <div class="modal-bg" id="radioModal">
+      <div class="modal" style="max-width: 560px">
+        <h3>Radio Sync</h3>
+        <div id="radioCollisionBanner" class="radio-collision-banner" style="display: none"></div>
+        <div class="hint" id="radioIdLine"></div>
+
+        <label>Outbound — paste these into your radio software</label>
+        <textarea
+          id="radioOutbound"
+          class="radio-frame-box"
+          rows="4"
+          readonly
+          spellcheck="false"
+        ></textarea>
+        <div class="hint" id="radioOutboundHint"></div>
+        <div class="modal-actions" style="justify-content: flex-start">
+          <button id="radioCompose">Refresh</button>
+          <button id="radioCopy">Copy</button>
+          <button id="radioMarkSent" class="primary">Mark sent</button>
+          <button id="radioBroadcastRoster">Broadcast Roster</button>
+        </div>
+
+        <label for="radioInbound">Inbound — paste received frames here (one per line)</label>
+        <textarea
+          id="radioInbound"
+          class="radio-frame-box"
+          rows="4"
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck="false"
+          placeholder="CKPT/1 O=…"
+        ></textarea>
+        <div class="modal-actions" style="justify-content: flex-start">
+          <button id="radioApply" class="primary">Apply</button>
+          <button id="radioInboundClear">Clear</button>
+        </div>
+
+        <label>Known peers</label>
+        <div id="radioPeers" class="radio-peers"></div>
+
+        <div class="modal-actions">
+          <button id="radioClose">Close</button>
+        </div>
+      </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
@@ -800,8 +925,14 @@
         myStop: 1,
         stops: [{ id: 1, name: 'Checkpoint' }],
         riders: [], // [{ num, name }]
-        events: [], // [{ origin, seq, rider, stop, kind, hhmm, recordedAt }]
+        events: [], // [{ origin, seq, rider, stop, kind, hhmm, recordedAt, name? }]
         settings: { sheetUrl: '', emailTo: '' },
+        // Radio sync (Phase 1):
+        vector: {}, // { [origin]: highest contiguous seq fully received }
+        pending: {}, // { [origin]: [event,...] } — out-of-order seq buffered until gaps fill
+        lastSentSeq: {}, // { [origin]: seq } — highest seq this device has broadcast
+        collisions: [], // [{ origin, seq, local, inbound, observedAt }] — quarantined
+        peers: {}, // { [device]: { stop, lastHeardAt } } — populated from inbound frames
       };
       let viewStopId = 1; // currently-viewed stop; defaults to myStop on boot
       let editing = null; // { num, stop, field } during keypad edit
@@ -854,6 +985,11 @@
             sheetUrl: v1settings.sheetUrl || '',
             emailTo: v1settings.emailTo || '',
           },
+          vector: {},
+          pending: {},
+          lastSentSeq: {},
+          collisions: [],
+          peers: {},
         };
 
         // Synthesize events so the migrated grid looks identical to v1's.
@@ -885,6 +1021,8 @@
             });
           }
         }
+        // Initialize the vector for our own origin to whatever was synthesized.
+        if (state.events.length > 0) state.vector[myDevice] = seq - 1;
         saveState();
       }
 
@@ -896,17 +1034,21 @@
         }
       }
 
-      function appendEvent(kind, riderNum, stopId, hhmm) {
+      // Append a new event to the local log under our own origin.
+      // partial: { kind, rider, stop?, hhmm?, name? }
+      // - timed events (A/D/Z/Y) require stop + hhmm
+      // - roster events (R) require name; stop and hhmm are unused
+      function appendEvent(partial) {
         const seq = nextSeqFor(state.myDevice);
-        state.events.push({
+        const ev = {
           origin: state.myDevice,
           seq,
-          rider: riderNum,
-          stop: stopId,
-          kind,
-          hhmm,
           recordedAt: Date.now(),
-        });
+          ...partial,
+        };
+        state.events.push(ev);
+        // Locally-recorded events are always contiguous, so vector advances by 1.
+        state.vector[state.myDevice] = seq;
         saveState();
       }
 
@@ -924,6 +1066,7 @@
         const map = new Map();
         const sorted = [...state.events].sort((a, b) => a.origin - b.origin || a.seq - b.seq);
         for (const e of sorted) {
+          if (e.kind === 'R') continue; // roster events don't affect the times grid
           const key = e.rider + ':' + e.stop;
           let v = map.get(key);
           if (!v) {
@@ -959,6 +1102,18 @@
       }
       tickClock();
 
+      function ymdFromMs(ms) {
+        const d = new Date(ms);
+        return d.getFullYear().toString() + pad(d.getMonth() + 1) + pad(d.getDate());
+      }
+      const ymdToday = () => ymdFromMs(Date.now());
+      function dateMidnightMs(yyyymmdd) {
+        const y = parseInt(yyyymmdd.slice(0, 4), 10);
+        const m = parseInt(yyyymmdd.slice(4, 6), 10);
+        const d = parseInt(yyyymmdd.slice(6, 8), 10);
+        return new Date(y, m - 1, d).getTime();
+      }
+
       // Parse user-entered time. Accepts: HH:MM, HH:MM:SS, HMM, HHMM. Returns 4-digit
       // HHMM or null. The HH:MM:SS tolerance lets a pasted v1 CSV value round-trip.
       function parseHHMM(input) {
@@ -984,6 +1139,440 @@
         if (isNaN(h) || isNaN(m)) return null;
         if (h < 0 || h > 23 || m < 0 || m > 59) return null;
         return pad(h) + pad(m);
+      }
+
+      // ============ RADIO SYNC CODEC ============
+      // Wire format defined in RADIO-SYNC.md §5. Frame: `CKPT/1 <body> *<CRC>`. CRC is
+      // CRC-16-CCITT (poly 0x1021, init 0xFFFF, no final XOR), 4 uppercase hex chars,
+      // computed over every byte up to and including the space before `*`.
+      const FRAME_MAGIC = 'CKPT/1';
+      const FRAME_MAX_CHARS = 67; // APRS message-field limit
+
+      function crc16(s) {
+        let crc = 0xffff;
+        for (let i = 0; i < s.length; i++) {
+          crc ^= s.charCodeAt(i) << 8;
+          for (let b = 0; b < 8; b++) {
+            crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+          }
+        }
+        return crc.toString(16).toUpperCase().padStart(4, '0');
+      }
+
+      // Roster-name encoding: spaces → '_', literal underscores and any byte outside
+      // [A-Za-z0-9.-] → %XX (UTF-8). Decoder reverses: %XX → byte, '_' → space.
+      function encodeName(name) {
+        if (!name) return '';
+        const bytes = new TextEncoder().encode(String(name));
+        let out = '';
+        for (let i = 0; i < bytes.length; i++) {
+          const b = bytes[i];
+          if (
+            (b >= 0x30 && b <= 0x39) || // 0-9
+            (b >= 0x41 && b <= 0x5a) || // A-Z
+            (b >= 0x61 && b <= 0x7a) || // a-z
+            b === 0x2e || // .
+            b === 0x2d // -
+          ) {
+            out += String.fromCharCode(b);
+          } else if (b === 0x20) {
+            out += '_';
+          } else {
+            out += '%' + b.toString(16).toUpperCase().padStart(2, '0');
+          }
+        }
+        return out;
+      }
+
+      function decodeName(encoded) {
+        const bytes = [];
+        for (let i = 0; i < encoded.length; i++) {
+          const c = encoded[i];
+          if (c === '%' && i + 2 < encoded.length) {
+            const hex = encoded.substr(i + 1, 2);
+            const b = parseInt(hex, 16);
+            if (!isNaN(b) && /^[0-9A-Fa-f]{2}$/.test(hex)) {
+              bytes.push(b);
+              i += 2;
+              continue;
+            }
+          }
+          if (c === '_') bytes.push(0x20);
+          else bytes.push(c.charCodeAt(0));
+        }
+        return new TextDecoder().decode(new Uint8Array(bytes));
+      }
+
+      // Day offset between an event's recordedAt-date and a frame's D=. Returns an
+      // integer; only ±1 is encodable per spec, callers split frames otherwise.
+      function dayOffsetVsFrame(event, frameDate) {
+        const ev = ymdFromMs(event.recordedAt);
+        const fy = parseInt(frameDate.slice(0, 4), 10);
+        const fm = parseInt(frameDate.slice(4, 6), 10);
+        const fd = parseInt(frameDate.slice(6, 8), 10);
+        const ey = parseInt(ev.slice(0, 4), 10);
+        const em = parseInt(ev.slice(4, 6), 10);
+        const ed = parseInt(ev.slice(6, 8), 10);
+        return Math.round((new Date(ey, em - 1, ed) - new Date(fy, fm - 1, fd)) / 86400000);
+      }
+
+      function encodeEventToken(event, frameStop, frameDate) {
+        if (event.kind === 'R') {
+          return event.rider + 'R' + encodeName(event.name || '');
+        }
+        let s = event.rider + event.kind + event.hhmm;
+        if (event.stop !== frameStop) s += '/' + event.stop;
+        const off = dayOffsetVsFrame(event, frameDate);
+        if (off === -1) s += '/d-1';
+        else if (off === 1) s += '/d+1';
+        return s;
+      }
+
+      // Encode a DATA frame. events: contiguous-seq run from one origin (events.length >= 1).
+      function encodeFrame(events, options) {
+        const opts = options || {};
+        const origin = events[0].origin;
+        const seqStart = events[0].seq;
+        const seqEnd = events[events.length - 1].seq;
+        const frameStop =
+          opts.stop != null ? opts.stop : events[0].stop != null ? events[0].stop : 1;
+        const frameDate = opts.date || ymdToday();
+        const tokens = events.map((e) => encodeEventToken(e, frameStop, frameDate)).join(' ');
+        const body =
+          FRAME_MAGIC +
+          ' O=' +
+          origin +
+          ' S=' +
+          frameStop +
+          ' D=' +
+          frameDate +
+          ' N=' +
+          seqStart +
+          '-' +
+          seqEnd +
+          ' ' +
+          tokens +
+          ' ';
+        return body + '*' + crc16(body);
+      }
+
+      function parseKV(s, key) {
+        const prefix = key + '=';
+        if (!s || !s.startsWith(prefix)) return null;
+        const v = s.slice(prefix.length);
+        if (key === 'O' || key === 'S' || key === 'F') {
+          const n = parseInt(v, 10);
+          return isNaN(n) ? null : n;
+        }
+        return v;
+      }
+
+      function parseEventToken(tok, ctx) {
+        let i = 0;
+        while (i < tok.length && tok[i] >= '0' && tok[i] <= '9') i++;
+        if (i === 0) return { error: 'no rider digits' };
+        const rider = parseInt(tok.slice(0, i), 10);
+        if (i >= tok.length) return { error: 'truncated event' };
+        const kind = tok[i];
+        i++;
+
+        if (kind === 'R') {
+          const name = decodeName(tok.slice(i));
+          if (name.length === 0) return { error: 'empty roster name' };
+          if (new TextEncoder().encode(name).length > 60) {
+            return { error: 'roster name > 60 bytes' };
+          }
+          return {
+            origin: ctx.origin,
+            seq: ctx.seq,
+            kind: 'R',
+            rider,
+            stop: ctx.stop,
+            hhmm: null,
+            name,
+            recordedAt: dateMidnightMs(ctx.date),
+          };
+        }
+
+        if (!'ADZY'.includes(kind)) {
+          // Unknown timed kind — receiver MUST ignore but seq accounting still applies.
+          return { unknownKind: true, origin: ctx.origin, seq: ctx.seq, kind, rider };
+        }
+        if (i + 4 > tok.length) return { error: 'truncated hhmm' };
+        const hhmm = tok.slice(i, i + 4);
+        if (!/^\d{4}$/.test(hhmm)) return { error: 'bad hhmm' };
+        const hh = parseInt(hhmm.slice(0, 2), 10);
+        const mm = parseInt(hhmm.slice(2, 4), 10);
+        if (hh > 23 || mm > 59) return { error: 'hhmm out of range' };
+        i += 4;
+
+        let stop = ctx.stop;
+        let dayOffset = 0;
+        while (i < tok.length) {
+          if (tok[i] !== '/') return { error: 'expected /' };
+          i++;
+          if (tok[i] === 'd') {
+            i++;
+            const sign = tok[i];
+            if (sign !== '+' && sign !== '-') return { error: 'bad day-offset sign' };
+            i++;
+            let n = 0;
+            while (i < tok.length && tok[i] >= '0' && tok[i] <= '9') {
+              n = n * 10 + (tok.charCodeAt(i) - 48);
+              i++;
+            }
+            if (n !== 1) return { error: 'day offset must be 1 in v1' };
+            dayOffset = sign === '+' ? 1 : -1;
+          } else {
+            let n = 0;
+            const startI = i;
+            while (i < tok.length && tok[i] >= '0' && tok[i] <= '9') {
+              n = n * 10 + (tok.charCodeAt(i) - 48);
+              i++;
+            }
+            if (i === startI || n < 1 || n > 99) return { error: 'bad stop override' };
+            stop = n;
+          }
+        }
+        return {
+          origin: ctx.origin,
+          seq: ctx.seq,
+          kind,
+          rider,
+          stop,
+          hhmm,
+          recordedAt:
+            dateMidnightMs(ctx.date) + dayOffset * 86400000 + (hh * 3600 + mm * 60) * 1000,
+        };
+      }
+
+      function decodeFrame(line) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith(FRAME_MAGIC + ' ')) return { error: 'unknown magic' };
+        const starIdx = trimmed.lastIndexOf(' *');
+        if (starIdx < 0) return { error: 'no CRC' };
+        const body = trimmed.slice(0, starIdx + 1);
+        const crcStr = trimmed.slice(starIdx + 2);
+        if (!/^[0-9A-F]{4}$/.test(crcStr)) return { error: 'bad CRC format' };
+        if (crc16(body) !== crcStr) return { error: 'CRC mismatch' };
+
+        const fields = body.trim().split(/\s+/);
+        const rest = fields.slice(1);
+        if (rest[0] === 'B') {
+          if (rest.length < 3) return { error: 'short beacon' };
+          const sender = parseKV(rest[1], 'F');
+          const stop = parseKV(rest[2], 'S');
+          if (sender == null || stop == null) return { error: 'bad beacon header' };
+          const vector = {};
+          for (let i = 3; i < rest.length; i++) {
+            const parts = rest[i].split('/');
+            if (parts.length !== 2) return { error: 'bad beacon vector' };
+            const oi = parseInt(parts[0], 10);
+            const si = parseInt(parts[1], 10);
+            if (isNaN(oi) || isNaN(si)) return { error: 'bad beacon vector' };
+            vector[oi] = si;
+          }
+          return { type: 'beacon', sender, stop, vector };
+        }
+        if (rest.length < 5) return { error: 'short data frame' };
+        const origin = parseKV(rest[0], 'O');
+        const stop = parseKV(rest[1], 'S');
+        const date = parseKV(rest[2], 'D');
+        const seqRange = parseKV(rest[3], 'N');
+        if (origin == null || stop == null || !date || !seqRange) {
+          return { error: 'bad data header' };
+        }
+        if (!/^\d{8}$/.test(date)) return { error: 'bad date' };
+        const m = seqRange.match(/^(\d+)-(\d+)$/);
+        if (!m) return { error: 'bad seq range' };
+        const seqStart = parseInt(m[1], 10);
+        const seqEnd = parseInt(m[2], 10);
+        if (seqEnd < seqStart) return { error: 'inverted seq range' };
+
+        const tokens = rest.slice(4);
+        const expected = seqEnd - seqStart + 1;
+        if (tokens.length !== expected) {
+          return { error: 'event count ' + tokens.length + ' != range ' + expected };
+        }
+        const events = [];
+        for (let i = 0; i < tokens.length; i++) {
+          const ev = parseEventToken(tokens[i], {
+            origin,
+            seq: seqStart + i,
+            stop,
+            date,
+          });
+          if (ev.error) return { error: 'event seq ' + (seqStart + i) + ': ' + ev.error };
+          events.push(ev);
+        }
+        return { type: 'data', origin, stop, date, seqStart, seqEnd, events };
+      }
+
+      // ============ RADIO SYNC: COMPOSE / APPLY ============
+      function pendingOutbound() {
+        const lastSent = state.lastSentSeq[state.myDevice] || 0;
+        return state.events
+          .filter((e) => e.origin === state.myDevice && e.seq > lastSent)
+          .sort((a, b) => a.seq - b.seq);
+      }
+
+      // Greedy splitter: emits the longest prefix that fits FRAME_MAX_CHARS, then repeats.
+      // Events MUST come from a single origin and be in contiguous-seq order.
+      function composeFrames(events) {
+        if (events.length === 0) return [];
+        const frames = [];
+        let i = 0;
+        const today = ymdToday();
+        while (i < events.length) {
+          const start = i;
+          const frameStop = events[start].stop != null ? events[start].stop : state.myStop;
+          // Skip events whose date can't be expressed via /d±1 from today's frame date —
+          // shouldn't happen for our own newly-recorded events, but defensive.
+          if (events[start].kind !== 'R' && Math.abs(dayOffsetVsFrame(events[start], today)) > 1) {
+            i++;
+            continue;
+          }
+          let lastValid = start;
+          let j = start + 1;
+          while (j < events.length) {
+            if (events[j].kind !== 'R' && Math.abs(dayOffsetVsFrame(events[j], today)) > 1) {
+              break;
+            }
+            const candidate = encodeFrame(events.slice(start, j + 1), {
+              stop: frameStop,
+              date: today,
+            });
+            if (candidate.length > FRAME_MAX_CHARS) break;
+            lastValid = j;
+            j++;
+          }
+          frames.push(
+            encodeFrame(events.slice(start, lastValid + 1), {
+              stop: frameStop,
+              date: today,
+            })
+          );
+          i = lastValid + 1;
+        }
+        return frames;
+      }
+
+      function eventsEqual(a, b) {
+        if (a.origin !== b.origin || a.seq !== b.seq || a.kind !== b.kind || a.rider !== b.rider) {
+          return false;
+        }
+        if (a.kind === 'R') return a.name === b.name;
+        return a.stop === b.stop && a.hhmm === b.hhmm;
+      }
+
+      function applyRosterEvent(ev) {
+        const existing = state.riders.find((r) => r.num === ev.rider);
+        if (existing) existing.name = ev.name;
+        else {
+          state.riders.push({ num: ev.rider, name: ev.name });
+          state.riders.sort((a, b) => a.num - b.num);
+        }
+      }
+
+      // Try to apply a single event. Returns 'applied' | 'dedupe' | 'collision' | 'pending'.
+      function applyEvent(ev) {
+        const existing = state.events.find((e) => e.origin === ev.origin && e.seq === ev.seq);
+        if (existing) {
+          if (eventsEqual(existing, ev)) return 'dedupe';
+          state.collisions.push({
+            origin: ev.origin,
+            seq: ev.seq,
+            local: existing,
+            inbound: ev,
+            observedAt: Date.now(),
+          });
+          return 'collision';
+        }
+        const v = state.vector[ev.origin] || 0;
+        if (ev.seq <= v) {
+          // Vector says we have this seq, but no event in log — corrupt; treat as collision.
+          state.collisions.push({
+            origin: ev.origin,
+            seq: ev.seq,
+            local: null,
+            inbound: ev,
+            observedAt: Date.now(),
+            reason: 'gap-below-vector',
+          });
+          return 'collision';
+        }
+        if (ev.seq === v + 1) {
+          state.events.push(ev);
+          state.vector[ev.origin] = ev.seq;
+          if (ev.kind === 'R') applyRosterEvent(ev);
+          drainPending(ev.origin);
+          return 'applied';
+        }
+        if (!state.pending[ev.origin]) state.pending[ev.origin] = [];
+        if (!state.pending[ev.origin].some((p) => p.seq === ev.seq)) {
+          state.pending[ev.origin].push(ev);
+          state.pending[ev.origin].sort((a, b) => a.seq - b.seq);
+        }
+        return 'pending';
+      }
+
+      function drainPending(origin) {
+        const queue = state.pending[origin];
+        if (!queue || queue.length === 0) return;
+        while (queue.length > 0 && queue[0].seq === (state.vector[origin] || 0) + 1) {
+          const ev = queue.shift();
+          state.events.push(ev);
+          state.vector[origin] = ev.seq;
+          if (ev.kind === 'R') applyRosterEvent(ev);
+        }
+      }
+
+      // Apply everything pasted into the inbound textbox. Returns counters.
+      function applyInbound(text) {
+        const lines = text
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+        let applied = 0,
+          dedupe = 0,
+          errors = 0,
+          collisions = 0;
+        const errorLines = [];
+        for (const line of lines) {
+          if (!line.startsWith(FRAME_MAGIC)) {
+            errors++;
+            errorLines.push('non-checkpoint line skipped');
+            continue;
+          }
+          const decoded = decodeFrame(line);
+          if (decoded.error) {
+            errors++;
+            errorLines.push(decoded.error);
+            continue;
+          }
+          if (decoded.type === 'beacon') {
+            // Phase 2 will use beacon vectors for retransmit prompts; for now just track presence.
+            state.peers[decoded.sender] = {
+              stop: decoded.stop,
+              lastHeardAt: Date.now(),
+            };
+            continue;
+          }
+          state.peers[decoded.origin] = {
+            stop: decoded.stop,
+            lastHeardAt: Date.now(),
+          };
+          for (const ev of decoded.events) {
+            if (ev.unknownKind) continue;
+            const r = applyEvent(ev);
+            if (r === 'applied' || r === 'pending') applied++;
+            else if (r === 'dedupe') dedupe++;
+            else if (r === 'collision') collisions++;
+          }
+        }
+        saveState();
+        render();
+        return { applied, dedupe, errors, collisions, errorLines };
       }
 
       // ============ RENDERING ============
@@ -1117,7 +1706,12 @@
         const field = cell.dataset.field;
         const r = state.riders.find((x) => x.num === num);
         if (!r) return;
-        appendEvent(field === 'arrival' ? 'A' : 'D', num, viewStopId, nowHHMM());
+        appendEvent({
+          kind: field === 'arrival' ? 'A' : 'D',
+          rider: num,
+          stop: viewStopId,
+          hhmm: nowHHMM(),
+        });
         // Render first so the new (filled) cell exists, then flash it. Flashing the old
         // node would be wiped by the re-render mid-animation.
         render();
@@ -1157,16 +1751,20 @@
         if (!editing) return;
         const r = state.riders.find((x) => x.num === editing.num);
         if (!r) return;
-        if (parsed === null) {
-          appendEvent(
-            editing.field === 'arrival' ? 'Z' : 'Y',
-            editing.num,
-            editing.stop,
-            nowHHMM()
-          );
-        } else {
-          appendEvent(editing.field === 'arrival' ? 'A' : 'D', editing.num, editing.stop, parsed);
-        }
+        const kind =
+          parsed === null
+            ? editing.field === 'arrival'
+              ? 'Z'
+              : 'Y'
+            : editing.field === 'arrival'
+              ? 'A'
+              : 'D';
+        appendEvent({
+          kind,
+          rider: editing.num,
+          stop: editing.stop,
+          hhmm: parsed === null ? nowHHMM() : parsed,
+        });
         closeTimeModal();
         render();
       }
@@ -1548,6 +2146,48 @@
       $('expGmail').addEventListener('click', emailViaGmail);
       $('expSheets').addEventListener('click', syncToSheet);
       $('expShare').addEventListener('click', shareViaSystem);
+      $('expEventLog').addEventListener('click', saveEventLogFile);
+
+      // Save the raw append-only event log as CSV. Every event since the v2 schema
+      // landed, including roster events and clears. Useful for post-event audit and
+      // for re-playing a session into a fresh device.
+      function saveEventLogFile() {
+        if (state.events.length === 0) {
+          toast('Event log is empty');
+          return;
+        }
+        const rows = [['origin', 'seq', 'recordedAt', 'kind', 'rider', 'stop', 'hhmm', 'name']];
+        const sorted = [...state.events].sort((a, b) => a.origin - b.origin || a.seq - b.seq);
+        for (const e of sorted) {
+          rows.push([
+            e.origin,
+            e.seq,
+            new Date(e.recordedAt).toISOString(),
+            e.kind,
+            e.rider,
+            e.stop != null ? e.stop : '',
+            e.hhmm ? formatHHMM(e.hhmm) : '',
+            e.name || '',
+          ]);
+        }
+        const csv = rows
+          .map((row) =>
+            row
+              .map((cell) => {
+                let s = String(cell == null ? '' : cell);
+                if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+              })
+              .join(',')
+          )
+          .join('\n');
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `checkpoint-eventlog-${stamp}.csv`;
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        triggerDownload(blob, filename);
+        closeExportModal();
+        toast(`Saved ${filename}`);
+      }
 
       // ============ SETTINGS ============
       const APPS_SCRIPT_URL_RE = /^https:\/\/script\.google\.com\//;
@@ -1710,6 +2350,182 @@
 
       // Top-level stop switcher (sub-header dropdown).
       $('stopSelect').addEventListener('change', onStopSelectChange);
+
+      // ============ RADIO PANEL ============
+      function refreshRadioPanel() {
+        // Outbound textarea: every pending frame, one per line.
+        const frames = composeFrames(pendingOutbound());
+        $('radioOutbound').value = frames.join('\n');
+        const pendingCount = pendingOutbound().length;
+        const frameCount = frames.length;
+        const sep = pendingCount === 1 ? '' : 's';
+        const fSep = frameCount === 1 ? '' : 's';
+        $('radioOutboundHint').textContent =
+          pendingCount === 0
+            ? 'Nothing to send — all caught up.'
+            : `${pendingCount} unsent event${sep} in ${frameCount} frame${fSep}.`;
+
+        // Identity line
+        $('radioIdLine').textContent =
+          `My device id: ${state.myDevice} · My stop: ${state.myStop} (${
+            (state.stops.find((s) => s.id === state.myStop) || {}).name || '?'
+          })`;
+
+        // Collision banner
+        const banner = $('radioCollisionBanner');
+        if (state.collisions.length > 0) {
+          banner.style.display = '';
+          banner.innerHTML =
+            `<strong>${state.collisions.length} device-id collision${
+              state.collisions.length === 1 ? '' : 's'
+            } detected.</strong> ` +
+            'Two devices may share an id. Coordinate with peers, fix your <em>My device id</em> ' +
+            'in Settings → Advanced, then re-broadcast. ' +
+            '<button id="collisionDismissBtn">Clear list</button>';
+          $('collisionDismissBtn').addEventListener('click', () => {
+            if (
+              confirm(
+                'Discard ' +
+                  state.collisions.length +
+                  ' quarantined event(s)? ' +
+                  'They will be lost. (The local log is unchanged.)'
+              )
+            ) {
+              state.collisions = [];
+              saveState();
+              refreshRadioPanel();
+            }
+          });
+        } else {
+          banner.style.display = 'none';
+          banner.innerHTML = '';
+        }
+
+        // Peers list
+        const peers = $('radioPeers');
+        peers.innerHTML = '';
+        const peerIds = Object.keys(state.peers)
+          .map((k) => parseInt(k, 10))
+          .filter((k) => !isNaN(k) && k !== state.myDevice)
+          .sort((a, b) => a - b);
+        if (peerIds.length === 0) {
+          peers.innerHTML =
+            '<div class="radio-empty">No peers heard yet. Apply an inbound frame to populate.</div>';
+        } else {
+          for (const id of peerIds) {
+            const p = state.peers[id];
+            const row = document.createElement('div');
+            row.className = 'radio-peer-row';
+            const events = state.vector[id] || 0;
+            row.innerHTML =
+              `<span class="peer-id">D=${id}</span>` +
+              `<span class="peer-meta">stop ${p.stop} · ${events} event${events === 1 ? '' : 's'} received · last heard ${formatRelative(p.lastHeardAt)}</span>`;
+            peers.appendChild(row);
+          }
+        }
+      }
+
+      function formatRelative(ts) {
+        if (!ts) return '—';
+        const ms = Date.now() - ts;
+        if (ms < 60000) return 'just now';
+        const mins = Math.floor(ms / 60000);
+        if (mins < 60) return mins + ' min ago';
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return hrs + ' h ago';
+        return Math.floor(hrs / 24) + ' d ago';
+      }
+
+      function openRadioModal() {
+        refreshRadioPanel();
+        $('radioInbound').value = '';
+        showModal('radioModal');
+      }
+
+      $('radioBtn').addEventListener('click', openRadioModal);
+      $('radioClose').addEventListener('click', () => hideModal('radioModal'));
+      $('radioCompose').addEventListener('click', refreshRadioPanel);
+      $('radioCopy').addEventListener('click', () => {
+        const text = $('radioOutbound').value;
+        if (!text) {
+          toast('Nothing to copy');
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(
+            () => toast('Copied'),
+            () => fallbackCopy()
+          );
+        } else {
+          fallbackCopy();
+        }
+      });
+      function fallbackCopy() {
+        const el = $('radioOutbound');
+        el.removeAttribute('readonly');
+        el.focus();
+        el.select();
+        try {
+          document.execCommand('copy');
+          toast('Copied');
+        } catch {
+          toast('Copy failed — select manually');
+        }
+        el.setAttribute('readonly', 'readonly');
+      }
+      $('radioMarkSent').addEventListener('click', () => {
+        const v = state.vector[state.myDevice] || 0;
+        if (v === 0) {
+          toast('Nothing to mark sent');
+          return;
+        }
+        state.lastSentSeq[state.myDevice] = v;
+        saveState();
+        refreshRadioPanel();
+        toast('Marked sent through seq ' + v);
+      });
+      $('radioApply').addEventListener('click', () => {
+        const text = $('radioInbound').value;
+        if (!text.trim()) {
+          toast('Paste a frame first');
+          return;
+        }
+        const r = applyInbound(text);
+        const parts = [];
+        if (r.applied) parts.push(r.applied + ' applied');
+        if (r.dedupe) parts.push(r.dedupe + ' duplicate');
+        if (r.collisions) parts.push(r.collisions + ' collision');
+        if (r.errors) parts.push(r.errors + ' error');
+        toast(parts.length ? parts.join(' · ') : 'No frames found');
+        if (r.applied || r.collisions || r.errors === 0) {
+          $('radioInbound').value = '';
+        }
+        refreshRadioPanel();
+      });
+      $('radioInboundClear').addEventListener('click', () => {
+        $('radioInbound').value = '';
+      });
+      $('radioBroadcastRoster').addEventListener('click', () => {
+        if (state.riders.length === 0) {
+          toast('Roster is empty');
+          return;
+        }
+        if (
+          !confirm(
+            'Emit ' +
+              state.riders.length +
+              ' roster event(s) (one per rider) into the log? ' +
+              'They will appear in the outbound queue for radio sync.'
+          )
+        ) {
+          return;
+        }
+        for (const r of state.riders) {
+          appendEvent({ kind: 'R', rider: r.num, stop: state.myStop, name: r.name || '' });
+        }
+        refreshRadioPanel();
+        toast('Roster broadcast queued (' + state.riders.length + ' events)');
+      });
 
       // ============ TOAST ============
       let toastTimer = null;
