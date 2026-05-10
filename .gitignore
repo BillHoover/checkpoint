@@ -9,6 +9,12 @@ desktop.ini
 *.swp
 *~
 
+# Tooling
+.claude/
+.playwright-mcp/
+tools/direwolf/
+tools/local-ssl/
+
 # Local test/build artifacts
 *.log
 node_modules/
