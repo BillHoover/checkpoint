@@ -47,6 +47,7 @@ After loading the page once, it runs **fully offline** — even airplane mode.
 ## Using the app
 
 - **Roster** — pre-load rider numbers + names. Can also import CSV (`number,name` per line).
+- **Stops** — configure each checkpoint along the course in **Settings → Stops**. Set **My stop** to the one this device is recording for. With more than one stop configured, a **Viewing** dropdown appears below the header so you can flip between stops; cells on stops other than your own are read-only (🔒).
 - **Tap an empty (orange-tinted) cell** → records current time instantly.
 - **Long-press a cell** (~½ second) → keypad to type/edit/clear. Filled cells can only be edited via long-press (no accidental tap-to-overwrite).
 - Times are 24-hour local, `HH:MM`.
@@ -86,6 +87,6 @@ The keypad accepts: `14:35`, `1435`, `935`, `9:5` (zero-padded automatically). A
 
 ## Data storage
 
-- Saved in `localStorage` under `checkpoint.riders.v1` and `checkpoint.settings.v1`.
+- Saved in `localStorage` under `checkpoint.state.v2` (single key, contains stops, riders, the event log, and settings). The legacy `checkpoint.riders.v1` and `checkpoint.settings.v1` keys are left in place as a one-version backup if you upgraded from v0.1.x.
 - **Per-device, per-browser.** Clearing browser data or uninstalling the PWA loses local data — **export first.**
 - Nothing is sent to any server unless you explicitly use Email or Sheets sync.

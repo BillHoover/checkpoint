@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — 2026-05-10 — Multi-stop refactor
+
+- One app instance now tracks multiple checkpoints. Configure stops in **Settings → Stops**; pick "My stop" as the one this device records for. Other stops are visible (read-only) via the **Viewing** dropdown that appears in a sub-header strip when more than one stop is configured.
+- Cells on stops other than your own are inert — no tap-to-record, no long-press, no keypad. Visually desaturated with a 🔒 read-only indicator. Cells on your own stop behave exactly as before (tap-to-record on empty, long-press-only on filled).
+- Internal data model is now an **append-only event log** keyed by `(origin, seq)`. Every record/edit/clear is a new event; the displayed grid is a reduction over the log. This is the foundation the upcoming radio-sync work depends on, and gives a clean audit trail for free.
+- Storage migrated from `checkpoint.riders.v1` + `checkpoint.settings.v1` to a single `checkpoint.state.v2` key. Migration is automatic and one-shot on first boot of v0.2; legacy keys are left in place as a one-version backup.
+- New Settings → Advanced section exposes a **My device id** (1–99). Most users will never touch this; it identifies events recorded by this device when multiple devices share a log over radio sync.
+- CSV filenames and Sheet tab titles now include the currently-selected stop's name (e.g. `checkpoint-Stop2-Mile-30-2026-05-10T10-15-23.csv`). The Apps Script payload also carries the stop's `id` and `name`.
+- Service worker cache bumped to `checkpoint-v3` so installed clients pick up the new build.
+- See `MULTI-STOP.md` for the design that drove this refactor; `RADIO-SYNC.md` is the companion design for the next phase.
+
 ## 0.1.1 — 2026-05-09 — Hardening pass
 
 - Long-press is now robust to minor finger drift (gloved use). Movement past ~10 px cancels; small wobble does not. Removes the previous `pointerleave` cancel that was overzealous on iOS.

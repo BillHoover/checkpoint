@@ -423,6 +423,121 @@
         opacity: 1;
       }
 
+      /* Stop switcher (sub-header strip — visible only when >1 stop is configured) */
+      .stop-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        background: var(--panel-2);
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+        font-size: 13px;
+      }
+      .stop-bar label {
+        color: var(--text-dim);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .stop-bar select {
+        flex: 1;
+        min-width: 0;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 6px 8px;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .stop-lock {
+        font-size: 11px;
+        color: var(--accent);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      /* Read-only mode — when viewing a stop other than my-stop, cells are
+         desaturated and don't respond to taps or long-press. */
+      body.viewing-other .time-cell {
+        cursor: default;
+        filter: saturate(0.5) brightness(0.85);
+      }
+      body.viewing-other .time-cell.empty {
+        filter: saturate(0.3) brightness(0.65);
+      }
+      body.viewing-other .time-cell:active {
+        background: inherit;
+      }
+
+      /* Settings — stops editor */
+      .stops-list {
+        max-height: 180px;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        margin-top: 4px;
+      }
+      .stop-row {
+        display: flex;
+        gap: 6px;
+        padding: 6px;
+        border-bottom: 1px solid var(--border);
+      }
+      .stop-row:last-child {
+        border-bottom: none;
+      }
+      .stop-row input {
+        font-size: 14px;
+        padding: 8px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-family: inherit;
+      }
+      .stop-row input.stop-id {
+        flex: 0 0 60px;
+        text-align: center;
+      }
+      .stop-row input.stop-name {
+        flex: 1;
+        min-width: 0;
+      }
+      .stop-row button {
+        padding: 6px 10px;
+        min-height: auto;
+      }
+
+      /* Settings — my-stop dropdown */
+      .modal select {
+        width: 100%;
+        padding: 12px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 16px;
+      }
+
+      /* Settings — Advanced collapsible section */
+      .advanced {
+        margin-top: 16px;
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+      }
+      .advanced summary {
+        cursor: pointer;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-dim);
+        margin-bottom: 8px;
+      }
+
       /* Larger screens */
       @media (min-width: 768px) {
         tbody td {
@@ -446,6 +561,18 @@
         <button id="exportBtn" class="primary" title="Export options">Export ▾</button>
       </div>
     </header>
+
+    <div class="stop-bar" id="stopBar" style="display: none">
+      <label for="stopSelect">Viewing</label>
+      <select id="stopSelect"></select>
+      <span
+        id="stopLock"
+        class="stop-lock"
+        style="display: none"
+        title="Read-only — switch your stop in Settings to edit"
+        >🔒 read-only</span
+      >
+    </div>
 
     <div class="table-wrap" id="tableWrap">
       <div class="empty-state" id="emptyState">
@@ -527,6 +654,24 @@
     <div class="modal-bg" id="settingsModal">
       <div class="modal" style="max-width: 480px">
         <h3>Settings</h3>
+
+        <label>Stops</label>
+        <div class="hint">
+          Stops along the course. All operators on this event should configure the same list with
+          matching ids during the pre-event briefing.
+        </div>
+        <div class="stops-list" id="stopsList"></div>
+        <div class="modal-actions" style="justify-content: flex-end; margin-top: 6px">
+          <button id="addStopBtn">+ Add stop</button>
+        </div>
+
+        <label for="myStopSelect">My stop</label>
+        <select id="myStopSelect"></select>
+        <div class="hint">
+          The stop this device is recording for. Only this stop's cells are editable; other stops
+          are view-only.
+        </div>
+
         <label for="sheetUrl">Google Apps Script Web App URL</label>
         <input
           type="text"
@@ -543,6 +688,7 @@
             >How to set this up</a
           >
         </div>
+
         <label for="emailTo">Default email recipient (optional)</label>
         <input
           type="email"
@@ -554,6 +700,24 @@
           placeholder="results@example.com"
         />
         <div class="hint">Used as the To: when emailing via Gmail.</div>
+
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <label for="myDeviceInput">My device id</label>
+          <input
+            type="number"
+            id="myDeviceInput"
+            min="1"
+            max="99"
+            inputmode="numeric"
+            placeholder="1–99"
+          />
+          <div class="hint">
+            1–99. Identifies events recorded by this device. Leave at the default unless you're
+            coordinating multiple devices over radio sync.
+          </div>
+        </details>
+
         <div class="modal-actions">
           <button id="settingsTest">Test Sheet URL</button>
           <button id="settingsCancel">Cancel</button>
@@ -625,10 +789,22 @@
       'use strict';
 
       // ============ STATE ============
-      const STORAGE_KEY = 'checkpoint.riders.v1';
-      let riders = []; // [{ num, name, arrival, departure }]
-      let editing = null; // { riderNum, field }
+      const STATE_KEY = 'checkpoint.state.v2';
+      const LEGACY_RIDERS_KEY = 'checkpoint.riders.v1';
+      const LEGACY_SETTINGS_KEY = 'checkpoint.settings.v1';
       const PRESS_MOVE_THRESHOLD_SQ = 100; // (10px)^2 — beyond this, treat press as a scroll/drag
+
+      let state = {
+        version: 2,
+        myDevice: 1,
+        myStop: 1,
+        stops: [{ id: 1, name: 'Checkpoint' }],
+        riders: [], // [{ num, name }]
+        events: [], // [{ origin, seq, rider, stop, kind, hhmm, recordedAt }]
+        settings: { sheetUrl: '', emailTo: '' },
+      };
+      let viewStopId = 1; // currently-viewed stop; defaults to myStop on boot
+      let editing = null; // { num, stop, field } during keypad edit
 
       // ============ DOM HELPERS ============
       const $ = (id) => document.getElementById(id);
@@ -636,26 +812,143 @@
       const hideModal = (id) => $(id).classList.remove('show');
 
       // ============ PERSISTENCE ============
-      function loadRiders() {
+      function loadState() {
         try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (raw) riders = JSON.parse(raw) || [];
+          const raw = localStorage.getItem(STATE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.version === 2) {
+              state = Object.assign(state, parsed);
+              return;
+            }
+          }
         } catch {
-          riders = [];
+          /* fall through to migration */
         }
-      }
-      function saveRiders() {
+        // Migrate from v1: read legacy keys, synthesize one event per existing time.
+        // v1 keys are left in place as a one-version backup.
+        let v1riders = [];
+        let v1settings = {};
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(riders));
+          const raw = localStorage.getItem(LEGACY_RIDERS_KEY);
+          if (raw) v1riders = JSON.parse(raw) || [];
+        } catch {
+          /* ignore */
+        }
+        try {
+          const raw = localStorage.getItem(LEGACY_SETTINGS_KEY);
+          if (raw) v1settings = JSON.parse(raw) || {};
+        } catch {
+          /* ignore */
+        }
+
+        const myDevice = 1 + Math.floor(Math.random() * 99);
+        state = {
+          version: 2,
+          myDevice,
+          myStop: 1,
+          stops: [{ id: 1, name: 'Checkpoint' }],
+          riders: v1riders.map((r) => ({ num: r.num, name: r.name || '' })),
+          events: [],
+          settings: {
+            sheetUrl: v1settings.sheetUrl || '',
+            emailTo: v1settings.emailTo || '',
+          },
+        };
+
+        // Synthesize events so the migrated grid looks identical to v1's.
+        let seq = 1;
+        const now = Date.now();
+        for (const r of v1riders) {
+          const a = parseHHMM(r.arrival);
+          if (a) {
+            state.events.push({
+              origin: myDevice,
+              seq: seq++,
+              rider: r.num,
+              stop: 1,
+              kind: 'A',
+              hhmm: a,
+              recordedAt: now,
+            });
+          }
+          const d = parseHHMM(r.departure);
+          if (d) {
+            state.events.push({
+              origin: myDevice,
+              seq: seq++,
+              rider: r.num,
+              stop: 1,
+              kind: 'D',
+              hhmm: d,
+              recordedAt: now,
+            });
+          }
+        }
+        saveState();
+      }
+
+      function saveState() {
+        try {
+          localStorage.setItem(STATE_KEY, JSON.stringify(state));
         } catch {
           toast('Storage error');
         }
       }
 
+      function appendEvent(kind, riderNum, stopId, hhmm) {
+        const seq = nextSeqFor(state.myDevice);
+        state.events.push({
+          origin: state.myDevice,
+          seq,
+          rider: riderNum,
+          stop: stopId,
+          kind,
+          hhmm,
+          recordedAt: Date.now(),
+        });
+        saveState();
+      }
+
+      function nextSeqFor(origin) {
+        let max = 0;
+        for (const e of state.events) {
+          if (e.origin === origin && e.seq > max) max = e.seq;
+        }
+        return max + 1;
+      }
+
+      // Reduce events into per-(rider,stop) {arrival, departure}. Walks events in
+      // (origin, seq) order; A/D set, Z/Y clear. Memoized per render via renderTimes.
+      function deriveTimes() {
+        const map = new Map();
+        const sorted = [...state.events].sort((a, b) => a.origin - b.origin || a.seq - b.seq);
+        for (const e of sorted) {
+          const key = e.rider + ':' + e.stop;
+          let v = map.get(key);
+          if (!v) {
+            v = { arrival: null, departure: null };
+            map.set(key, v);
+          }
+          if (e.kind === 'A') v.arrival = e.hhmm;
+          else if (e.kind === 'D') v.departure = e.hhmm;
+          else if (e.kind === 'Z') v.arrival = null;
+          else if (e.kind === 'Y') v.departure = null;
+        }
+        return map;
+      }
+
       // ============ TIME UTILS ============
       const pad = (n) => n.toString().padStart(2, '0');
       const formatHM = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      const nowHMS = () => formatHM(new Date());
+      // Internal time format is 4-digit "HHMM" (matches the radio-sync wire format).
+      // formatHHMM(...) renders it as "HH:MM" for display; nowHHMM() emits the current
+      // local time in canonical form.
+      const formatHHMM = (s) => (s ? s.slice(0, 2) + ':' + s.slice(2, 4) : '');
+      const nowHHMM = () => {
+        const d = new Date();
+        return pad(d.getHours()) + pad(d.getMinutes());
+      };
 
       function tickClock() {
         const d = new Date();
@@ -666,10 +959,11 @@
       }
       tickClock();
 
-      // Parse user-entered time. Accepts: HH:MM, HMM, HHMM. Always returns HH:MM.
-      function parseTime(input) {
+      // Parse user-entered time. Accepts: HH:MM, HH:MM:SS, HMM, HHMM. Returns 4-digit
+      // HHMM or null. The HH:MM:SS tolerance lets a pasted v1 CSV value round-trip.
+      function parseHHMM(input) {
         if (!input) return null;
-        const s = input.trim();
+        const s = String(input).trim();
         if (!s) return null;
         let h, m;
         if (s.includes(':')) {
@@ -689,21 +983,33 @@
         }
         if (isNaN(h) || isNaN(m)) return null;
         if (h < 0 || h > 23 || m < 0 || m > 59) return null;
-        return pad(h) + ':' + pad(m);
+        return pad(h) + pad(m);
       }
 
       // ============ RENDERING ============
       const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
       const escapeHTML = (s) => String(s).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
 
+      // renderTimes is a per-render cache of deriveTimes() so cellTime() doesn't
+      // re-walk the event log for every cell.
+      let renderTimes = null;
+      const cellTime = (riderNum, stopId, kind) => {
+        const v = renderTimes.get(riderNum + ':' + stopId);
+        if (!v) return null;
+        return kind === 'arrival' ? v.arrival : v.departure;
+      };
+
       function render() {
         const tbody = $('riderBody');
-        const hasRiders = riders.length > 0;
+        const hasRiders = state.riders.length > 0;
         $('riderTable').style.display = hasRiders ? '' : 'none';
         $('emptyState').style.display = hasRiders ? 'none' : 'flex';
+        renderStopSwitcher();
+        document.body.classList.toggle('viewing-other', viewStopId !== state.myStop);
         if (!hasRiders) return;
 
-        tbody.innerHTML = riders.map(rowHTML).join('');
+        renderTimes = deriveTimes();
+        tbody.innerHTML = state.riders.map(rowHTML).join('');
         attachTimeHandlers();
       }
 
@@ -719,9 +1025,32 @@
       }
 
       function timeCellHTML(r, field) {
-        const val = r[field];
+        const val = cellTime(r.num, viewStopId, field);
         const cls = val ? `time-cell filled ${field}` : 'time-cell empty';
-        return `<td class="${cls}" data-num="${r.num}" data-field="${field}">${val || ''}</td>`;
+        return `<td class="${cls}" data-num="${r.num}" data-field="${field}">${val ? formatHHMM(val) : ''}</td>`;
+      }
+
+      // ============ STOP SWITCHER ============
+      function renderStopSwitcher() {
+        const wrap = $('stopBar');
+        const select = $('stopSelect');
+        // Hide the bar entirely with only one stop — single-stop users see no UI change.
+        if (state.stops.length <= 1) {
+          wrap.style.display = 'none';
+          return;
+        }
+        wrap.style.display = '';
+        const sorted = state.stops.slice().sort((a, b) => a.id - b.id);
+        select.innerHTML = sorted
+          .map((s) => {
+            const mine = s.id === state.myStop ? ' (mine)' : '';
+            return `<option value="${s.id}">Stop ${s.id} — ${escapeHTML(s.name)}${mine}</option>`;
+          })
+          .join('');
+        // viewStopId may have been removed; snap to myStop if so.
+        if (!sorted.some((s) => s.id === viewStopId)) viewStopId = state.myStop;
+        select.value = String(viewStopId);
+        $('stopLock').style.display = viewStopId === state.myStop ? 'none' : '';
       }
 
       // ============ CELL INTERACTION ============
@@ -729,12 +1058,17 @@
       // on different cells don't clobber each other. pointerleave is intentionally NOT
       // used to cancel — it fires on minor finger drift (especially with gloves) and
       // would defeat long-press. Movement past PRESS_MOVE_THRESHOLD cancels instead.
+      // When viewing another operator's stop, all cell handlers are skipped — the
+      // single gate is `viewStopId === state.myStop`.
       function attachTimeHandlers() {
+        const editable = viewStopId === state.myStop;
         document.querySelectorAll('.time-cell').forEach((cell) => {
-          cell.addEventListener('pointerdown', onPressStart);
-          cell.addEventListener('pointerup', onPressEnd);
-          cell.addEventListener('pointermove', onPressMove);
-          cell.addEventListener('pointercancel', onPressCancel);
+          if (editable) {
+            cell.addEventListener('pointerdown', onPressStart);
+            cell.addEventListener('pointerup', onPressEnd);
+            cell.addEventListener('pointermove', onPressMove);
+            cell.addEventListener('pointercancel', onPressCancel);
+          }
           cell.addEventListener('contextmenu', (e) => e.preventDefault());
         });
       }
@@ -781,10 +1115,9 @@
       function recordCurrentTime(cell) {
         const num = parseInt(cell.dataset.num, 10);
         const field = cell.dataset.field;
-        const r = riders.find((x) => x.num === num);
+        const r = state.riders.find((x) => x.num === num);
         if (!r) return;
-        r[field] = nowHMS();
-        saveRiders();
+        appendEvent(field === 'arrival' ? 'A' : 'D', num, viewStopId, nowHHMM());
         // Render first so the new (filled) cell exists, then flash it. Flashing the old
         // node would be wiped by the re-render mid-animation.
         render();
@@ -797,14 +1130,15 @@
       function openTimeModal(cell) {
         const num = parseInt(cell.dataset.num, 10);
         const field = cell.dataset.field;
-        const r = riders.find((x) => x.num === num);
+        const r = state.riders.find((x) => x.num === num);
         if (!r) return;
-        editing = { num, field };
+        editing = { num, stop: viewStopId, field };
         const label = field === 'arrival' ? 'Arrival' : 'Departure';
         const suffix = r.name ? ` (${r.name})` : '';
         $('timeModalTitle').textContent = `${label} — Rider #${num}${suffix}`;
         const input = $('timeInput');
-        input.value = r[field] || '';
+        const cur = cellTime(num, viewStopId, field);
+        input.value = cur ? formatHHMM(cur) : '';
         showModal('timeModal');
         setTimeout(() => {
           input.focus();
@@ -817,13 +1151,22 @@
         editing = null;
       }
 
-      // Set or clear the currently-edited cell's time. `parsed === ''` means clear.
+      // Commit the keypad result. parsed === null means "Clear" (emit Z or Y); a 4-digit
+      // hhmm means "Set" (emit A or D).
       function commitEdit(parsed) {
         if (!editing) return;
-        const r = riders.find((x) => x.num === editing.num);
+        const r = state.riders.find((x) => x.num === editing.num);
         if (!r) return;
-        r[editing.field] = parsed;
-        saveRiders();
+        if (parsed === null) {
+          appendEvent(
+            editing.field === 'arrival' ? 'Z' : 'Y',
+            editing.num,
+            editing.stop,
+            nowHHMM()
+          );
+        } else {
+          appendEvent(editing.field === 'arrival' ? 'A' : 'D', editing.num, editing.stop, parsed);
+        }
         closeTimeModal();
         render();
       }
@@ -835,24 +1178,30 @@
           toast('To clear, use the Clear button');
           return;
         }
-        const parsed = parseTime(val);
+        const parsed = parseHHMM(val);
         if (!parsed) {
           toast('Invalid time format');
           return;
         }
         commitEdit(parsed);
       });
-      $('timeClear').addEventListener('click', () => commitEdit(''));
+      $('timeClear').addEventListener('click', () => commitEdit(null));
       $('timeInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') $('timeSave').click();
         if (e.key === 'Escape') closeTimeModal();
       });
 
+      // Stop-switcher dropdown change.
+      function onStopSelectChange(e) {
+        viewStopId = parseInt(e.target.value, 10);
+        render();
+      }
+
       // ============ ROSTER SETUP ============
       function openRosterModal() {
         $('rosterList').innerHTML = '';
-        if (riders.length === 0) addRosterRow(1, '');
-        else riders.forEach((r) => addRosterRow(r.num, r.name));
+        if (state.riders.length === 0) addRosterRow(1, '');
+        else state.riders.forEach((r) => addRosterRow(r.num, r.name));
         showModal('rosterModal');
       }
       const closeRosterModal = () => hideModal('rosterModal');
@@ -882,8 +1231,9 @@
 
       $('rosterClear').addEventListener('click', () => {
         if (!confirm('Clear all riders AND all recorded times? This cannot be undone.')) return;
-        riders = [];
-        saveRiders();
+        state.riders = [];
+        state.events = [];
+        saveState();
         closeRosterModal();
         render();
       });
@@ -905,23 +1255,18 @@
             return;
           }
           seenNums.add(num);
-          // Preserve existing times if this rider was already in the roster.
-          const prev = riders.find((r) => r.num === num);
-          newRoster.push({
-            num,
-            name,
-            arrival: prev ? prev.arrival : '',
-            departure: prev ? prev.departure : '',
-          });
+          newRoster.push({ num, name });
         }
         newRoster.sort((a, b) => a.num - b.num);
-        riders = newRoster;
-        saveRiders();
+        state.riders = newRoster;
+        // Events for riders no longer in the roster stay in the log; they'll display
+        // as "(unknown)" until those riders are re-added with the same number.
+        saveState();
         closeRosterModal();
         render();
-        const plural = riders.length === 1 ? '' : 's';
+        const plural = state.riders.length === 1 ? '' : 's';
         const tail = skipped ? ` (skipped ${skipped} invalid)` : '';
-        toast(`Saved ${riders.length} rider${plural}${tail}`);
+        toast(`Saved ${state.riders.length} rider${plural}${tail}`);
       });
 
       // CSV import for roster
@@ -979,28 +1324,35 @@
       });
 
       // ============ EXPORT ============
-      const SETTINGS_KEY = 'checkpoint.settings.v1';
-      let settings = { sheetUrl: '', emailTo: '' };
-
-      function loadSettings() {
-        try {
-          const raw = localStorage.getItem(SETTINGS_KEY);
-          if (raw) settings = Object.assign(settings, JSON.parse(raw) || {});
-        } catch {
-          /* ignore */
-        }
+      // Settings live in state.settings (persisted via saveState); the standalone
+      // checkpoint.settings.v1 key is migrated once on first boot of v2.
+      function currentStop() {
+        return (
+          state.stops.find((s) => s.id === viewStopId) || {
+            id: viewStopId,
+            name: 'Stop ' + viewStopId,
+          }
+        );
       }
-      function saveSettings() {
-        try {
-          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-        } catch {
-          toast('Storage error');
-        }
+      // Filename-safe slug derived from the stop name. Falls back to "StopN" if the
+      // name has no usable characters (e.g., all emoji).
+      function stopSlug(stop) {
+        const slug = (stop.name || '').replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+        return slug || 'Stop' + stop.id;
       }
 
       function buildCSV() {
         const rows = [['Number', 'Name', 'Arrival', 'Departure']];
-        riders.forEach((r) => rows.push([r.num, r.name, r.arrival, r.departure]));
+        const times = deriveTimes();
+        state.riders.forEach((r) => {
+          const v = times.get(r.num + ':' + viewStopId) || { arrival: null, departure: null };
+          rows.push([
+            r.num,
+            r.name,
+            v.arrival ? formatHHMM(v.arrival) : '',
+            v.departure ? formatHHMM(v.departure) : '',
+          ]);
+        });
         return rows
           .map((row) =>
             row
@@ -1017,7 +1369,7 @@
 
       function exportFilename() {
         const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        return `checkpoint-${stamp}.csv`;
+        return `checkpoint-${stopSlug(currentStop())}-${stamp}.csv`;
       }
 
       const SHEET_FETCH_TIMEOUT_MS = 15000;
@@ -1026,15 +1378,20 @@
 
       // --- Open the export menu ---
       function openExportMenu() {
-        if (riders.length === 0) {
+        if (state.riders.length === 0) {
           toast('No data to export');
           return;
         }
 
-        const filled = riders.filter((r) => r.arrival || r.departure).length;
-        const plural = riders.length === 1 ? '' : 's';
+        const stop = currentStop();
+        const times = deriveTimes();
+        const filled = state.riders.filter((r) => {
+          const v = times.get(r.num + ':' + stop.id);
+          return v && (v.arrival || v.departure);
+        }).length;
+        const plural = state.riders.length === 1 ? '' : 's';
         $('exportSummary').textContent =
-          `${riders.length} rider${plural} • ${filled} with recorded times`;
+          `Stop ${stop.id} (${stop.name}) · ${state.riders.length} rider${plural} · ${filled} with recorded times`;
 
         configureSheetsButton();
 
@@ -1052,14 +1409,14 @@
       function configureSheetsButton() {
         const btn = $('expSheets');
         const sub = $('expSheetsSub');
-        if (!settings.sheetUrl) {
+        if (!state.settings.sheetUrl) {
           btn.disabled = true;
           sub.textContent = 'Configure URL in Settings first';
           return;
         }
         btn.disabled = false;
         try {
-          sub.textContent = `Append to ${new URL(settings.sheetUrl).hostname}`;
+          sub.textContent = `Append to ${new URL(state.settings.sheetUrl).hostname}`;
         } catch {
           sub.textContent = 'Append a new tab to your sheet';
         }
@@ -1076,15 +1433,18 @@
 
       // --- Email via Gmail ---
       function emailViaGmail() {
+        const stop = currentStop();
         const csv = buildCSV();
         const now = new Date();
-        const subject = `Checkpoint export ${now.toLocaleString()}`;
+        const subject = `Checkpoint Stop ${stop.id} (${stop.name}) export ${now.toLocaleString()}`;
         // Body: a small header followed by inline CSV. Gmail can paste it as-is.
-        const body = `Checkpoint data export\n${now.toString()}\nRiders: ${riders.length}\n\n${csv}`;
+        const body =
+          `Checkpoint data export\n${now.toString()}\n` +
+          `Stop ${stop.id} — ${stop.name}\nRiders: ${state.riders.length}\n\n${csv}`;
         // Gmail web compose URL — works on desktop and falls back gracefully on mobile.
         const url =
           'https://mail.google.com/mail/?view=cm&fs=1' +
-          `&to=${encodeURIComponent(settings.emailTo || '')}` +
+          `&to=${encodeURIComponent(state.settings.emailTo || '')}` +
           `&su=${encodeURIComponent(subject)}` +
           `&body=${encodeURIComponent(body)}`;
         window.open(url, '_blank', 'noopener');
@@ -1093,7 +1453,7 @@
 
       // --- Send to Google Sheet ---
       async function syncToSheet() {
-        if (!settings.sheetUrl) {
+        if (!state.settings.sheetUrl) {
           toast('Set Sheet URL in Settings');
           return;
         }
@@ -1105,18 +1465,24 @@
         const ctrl = new AbortController();
         const timeoutId = setTimeout(() => ctrl.abort(), SHEET_FETCH_TIMEOUT_MS);
         try {
+          const stop = currentStop();
+          const times = deriveTimes();
           const payload = {
             sentAt: new Date().toISOString(),
             device: navigator.userAgent || '',
-            riders: riders.map((r) => ({
-              num: r.num,
-              name: r.name,
-              arrival: r.arrival,
-              departure: r.departure,
-            })),
+            stop: { id: stop.id, name: stop.name },
+            riders: state.riders.map((r) => {
+              const v = times.get(r.num + ':' + stop.id) || { arrival: null, departure: null };
+              return {
+                num: r.num,
+                name: r.name,
+                arrival: v.arrival ? formatHHMM(v.arrival) : '',
+                departure: v.departure ? formatHHMM(v.departure) : '',
+              };
+            }),
           };
           // Apps Script web apps require text/plain to avoid a CORS preflight.
-          const resp = await fetch(settings.sheetUrl, {
+          const resp = await fetch(state.settings.sheetUrl, {
             method: 'POST',
             mode: 'cors',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1187,9 +1553,59 @@
       const APPS_SCRIPT_URL_RE = /^https:\/\/script\.google\.com\//;
 
       function openSettings() {
-        $('sheetUrl').value = settings.sheetUrl || '';
-        $('emailTo').value = settings.emailTo || '';
+        $('sheetUrl').value = state.settings.sheetUrl || '';
+        $('emailTo').value = state.settings.emailTo || '';
+        $('myDeviceInput').value = String(state.myDevice);
+        renderStopsEditor();
+        renderMyStopSelect();
         showModal('settingsModal');
+      }
+
+      function renderMyStopSelect() {
+        const sel = $('myStopSelect');
+        const sorted = state.stops.slice().sort((a, b) => a.id - b.id);
+        sel.innerHTML = sorted
+          .map((s) => `<option value="${s.id}">Stop ${s.id} — ${escapeHTML(s.name)}</option>`)
+          .join('');
+        sel.value = String(state.myStop);
+      }
+
+      function renderStopsEditor() {
+        const list = $('stopsList');
+        list.innerHTML = '';
+        state.stops
+          .slice()
+          .sort((a, b) => a.id - b.id)
+          .forEach((s) => addStopRow(s.id, s.name));
+      }
+
+      function addStopRow(id, name) {
+        const list = $('stopsList');
+        const row = document.createElement('div');
+        row.className = 'stop-row';
+        row.innerHTML = `
+    <input class="stop-id" type="number" min="1" max="99" value="${id || ''}" placeholder="#">
+    <input class="stop-name" type="text" value="${escapeHTML(name || '')}" placeholder="Stop name">
+    <button class="danger remove">×</button>`;
+        row.querySelector('.remove').addEventListener('click', () => {
+          // Warn if this stop has events attached. Removing the stop is a soft-delete:
+          // the events stay in the log, just hidden until the stop is re-added with the
+          // same id. That keeps roster history intact across operator coordination errors.
+          const idVal = parseInt(row.querySelector('.stop-id').value, 10);
+          if (!isNaN(idVal)) {
+            const eventCount = state.events.filter((e) => e.stop === idVal).length;
+            if (eventCount > 0) {
+              const ok = confirm(
+                `Stop ${idVal} has ${eventCount} recorded event${eventCount === 1 ? '' : 's'}. ` +
+                  'Remove anyway? The events stay in the log but will be hidden until the ' +
+                  'stop is re-added with the same id.'
+              );
+              if (!ok) return;
+            }
+          }
+          row.remove();
+        });
+        list.appendChild(row);
       }
 
       function saveSettingsFromForm() {
@@ -1201,11 +1617,47 @@
           );
           if (!ok) return;
         }
-        settings.sheetUrl = url;
-        settings.emailTo = email;
-        saveSettings();
+
+        // Read the stops editor.
+        const newStops = [];
+        const seen = new Set();
+        for (const row of document.querySelectorAll('#stopsList .stop-row')) {
+          const id = parseInt(row.querySelector('.stop-id').value, 10);
+          const name = row.querySelector('.stop-name').value.trim();
+          if (isNaN(id) || id < 1 || id > 99) continue;
+          if (seen.has(id)) {
+            toast(`Duplicate stop id ${id}`);
+            return;
+          }
+          seen.add(id);
+          newStops.push({ id, name: name || 'Stop ' + id });
+        }
+        if (newStops.length === 0) {
+          // Always keep at least one stop so the app has somewhere to record.
+          newStops.push({ id: 1, name: 'Checkpoint' });
+        }
+        newStops.sort((a, b) => a.id - b.id);
+        state.stops = newStops;
+
+        // myStop must reference a stop that still exists; clamp if it doesn't.
+        const myStop = parseInt($('myStopSelect').value, 10);
+        state.myStop = newStops.some((s) => s.id === myStop) ? myStop : newStops[0].id;
+
+        // myDevice 1..99 (advanced).
+        const dev = parseInt($('myDeviceInput').value, 10);
+        if (!isNaN(dev) && dev >= 1 && dev <= 99) {
+          state.myDevice = dev;
+        }
+
+        state.settings.sheetUrl = url;
+        state.settings.emailTo = email;
+        saveState();
         hideModal('settingsModal');
         toast('Settings saved');
+
+        // Snap the viewed stop to my-stop if the previously-viewed one was removed.
+        if (!state.stops.some((s) => s.id === viewStopId)) viewStopId = state.myStop;
+        render();
       }
 
       async function testSheetUrl() {
@@ -1239,11 +1691,25 @@
       $('settingsCancel').addEventListener('click', () => hideModal('settingsModal'));
       $('settingsSave').addEventListener('click', saveSettingsFromForm);
       $('settingsTest').addEventListener('click', testSheetUrl);
+      $('addStopBtn').addEventListener('click', () => {
+        // Suggest the lowest unused id 1..99 in the current editor.
+        const used = new Set(
+          Array.from(document.querySelectorAll('#stopsList .stop-id')).map((i) =>
+            parseInt(i.value, 10)
+          )
+        );
+        let next = 1;
+        while (used.has(next) && next < 100) next++;
+        addStopRow(next, '');
+      });
       $('howtoLink').addEventListener('click', (e) => {
         e.preventDefault();
         showModal('howtoModal');
       });
       $('howtoClose').addEventListener('click', () => hideModal('howtoModal'));
+
+      // Top-level stop switcher (sub-header dropdown).
+      $('stopSelect').addEventListener('change', onStopSelectChange);
 
       // ============ TOAST ============
       let toastTimer = null;
@@ -1268,8 +1734,9 @@
       document.addEventListener('gesturestart', (e) => e.preventDefault());
 
       // ============ INIT ============
-      loadSettings();
-      loadRiders();
+      loadState();
+      // Default the viewed stop to the operator's own stop on boot.
+      viewStopId = state.myStop;
       render();
     </script>
   </body>
