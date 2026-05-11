@@ -1,0 +1,42 @@
+#
+# Minimal direwolf.conf for the Checkpoint Pi bridge.
+#
+# Reference: https://github.com/wb2osz/direwolf/blob/master/doc/User-Guide.pdf
+#
+# Copy this to ~/.direwolf.conf (or wherever your install expects), edit the
+# callsign and audio device, then run: direwolf -t 0
+#
+
+#
+# Audio device. ADEVICE accepts ALSA device names (Linux), CoreAudio device
+# names (macOS), or a sound-card index. Use `arecord -L` (Linux) to discover.
+#
+ADEVICE plughw:1,0
+
+ACHANNELS 1
+
+#
+# Channel-0 config. MYCALL must be your licensed callsign with the SSID you've
+# allocated to this checkpoint. AJ6UU-1 through AJ6UU-15 are typical for a
+# multi-checkpoint event; -10 is conventionally an iGate, so prefer 1..9 for
+# checkpoint bridges.
+#
+CHANNEL 0
+MYCALL AJ6UU-1
+MODEM 1200
+# Push-to-talk: GPIO 23 on a Pi with a PTT cable, RIG <N> for hamlib CAT,
+# or omit entirely if the radio uses VOX.
+PTT GPIO 23
+
+#
+# KISS-over-TCP. The bridge talks to direwolf here.
+# Leave the AGW port (KISSPORT/AGWPORT) defaults unless you have a reason.
+#
+KISSPORT 8001
+
+#
+# Stop direwolf from doing things on its own — we are the application.
+# Comment out IGSERVER if you DO want this Pi to also act as an iGate.
+#
+# IGSERVER noam.aprs2.net
+# IGLOGIN AJ6UU 12345

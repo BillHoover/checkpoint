@@ -1,0 +1,37 @@
+#
+# systemd unit for the Checkpoint Pi bridge.
+#
+# Install:
+#   sudo cp checkpoint-bridge.service /etc/systemd/system/
+#   # Edit ExecStart/WorkingDirectory/User to match your install.
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now checkpoint-bridge
+#
+# Port 443 needs CAP_NET_BIND_SERVICE; granted below so we don't run as root.
+#
+
+[Unit]
+Description=Checkpoint Pi bridge (HTTPS + KISS-over-TCP radio I/O)
+Documentation=https://github.com/BillHoover/checkpoint
+After=network-online.target direwolf.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/checkpoint/pi
+ExecStart=/usr/bin/node server.mjs config.json
+Restart=on-failure
+RestartSec=5
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/pi/checkpoint/pi
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

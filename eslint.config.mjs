@@ -7,6 +7,8 @@ export default [
       'node_modules/**',
       'tools/direwolf/**',
       'tools/local-ssl/**',
+      'pi/node_modules/**',
+      'pi/certs/**',
       'apps-script.js',
     ],
   },
@@ -41,7 +43,7 @@ export default [
     },
   },
   {
-    files: ['tools/**/*.{js,mjs}'],
+    files: ['tools/**/*.{js,mjs}', 'pi/**/*.{js,mjs}'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

@@ -1,5 +1,5 @@
 // Checkpoint - offline service worker
-const CACHE = 'checkpoint-v4';
+const CACHE = 'checkpoint-v5';
 const ASSETS = [
   './',
   './index.html',

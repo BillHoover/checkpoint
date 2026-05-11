@@ -593,6 +593,65 @@
         color: var(--text-dim);
         text-align: center;
       }
+      .radio-bridge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        margin-top: 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--bg);
+        font-size: 12px;
+        color: var(--text-dim);
+        font-variant-numeric: tabular-nums;
+      }
+      .radio-bridge .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--text-dim);
+        flex-shrink: 0;
+      }
+      .radio-bridge.ok .dot {
+        background: #2ecc71;
+      }
+      .radio-bridge.warn .dot {
+        background: var(--accent);
+      }
+      .radio-bridge.err .dot {
+        background: var(--danger);
+      }
+      .radio-bridge .label {
+        font-weight: 600;
+        color: var(--text);
+      }
+      .radio-bridge .meta {
+        flex: 1;
+      }
+      .radio-bridge-inbox {
+        margin-top: 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--empty-tint);
+        font-size: 12px;
+        color: var(--text);
+        display: none;
+      }
+      .radio-bridge-inbox.has-frames {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .radio-bridge-inbox .count {
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .radio-bridge-inbox .spacer {
+        flex: 1;
+      }
 
       /* Settings — Advanced collapsible section */
       .advanced {
@@ -867,6 +926,11 @@
         <h3>Radio Sync</h3>
         <div id="radioCollisionBanner" class="radio-collision-banner" style="display: none"></div>
         <div class="hint" id="radioIdLine"></div>
+        <div id="radioBridgeStatus" class="radio-bridge" style="display: none">
+          <span class="dot"></span>
+          <span class="label" id="radioBridgeStation">—</span>
+          <span class="meta" id="radioBridgeMeta">checking…</span>
+        </div>
 
         <label>Outbound — paste these into your radio software</label>
         <textarea
@@ -881,6 +945,7 @@
           <button id="radioCompose">Refresh</button>
           <button id="radioCopy">Copy</button>
           <button id="radioMarkSent" class="primary">Mark sent</button>
+          <button id="radioSendViaRadio" style="display: none">Send via radio</button>
           <button id="radioBroadcastRoster">Broadcast Roster</button>
         </div>
 
@@ -897,6 +962,13 @@
         <div class="modal-actions" style="justify-content: flex-start">
           <button id="radioApply" class="primary">Apply</button>
           <button id="radioInboundClear">Clear</button>
+        </div>
+        <div id="radioBridgeInbox" class="radio-bridge-inbox">
+          <span class="count" id="radioBridgeInboxCount">0</span>
+          <span>frame(s) received via radio bridge</span>
+          <span class="spacer"></span>
+          <button id="radioBridgeApply" class="primary">Apply all</button>
+          <button id="radioBridgeDiscard">Discard</button>
         </div>
 
         <label>Known peers</label>
@@ -2401,6 +2473,9 @@
           banner.innerHTML = '';
         }
 
+        // Bridge UI (Pi radio bridge, if present)
+        refreshBridgeUi();
+
         // Peers list
         const peers = $('radioPeers');
         peers.innerHTML = '';
@@ -2527,6 +2602,208 @@
         toast('Roster broadcast queued (' + state.riders.length + ' events)');
       });
 
+      // ============ RADIO BRIDGE (Pi-side appliance, optional) ============
+      // When the PWA is served from a Checkpoint Pi bridge, /api/health responds
+      // with bridge metadata. The PWA then opens an SSE stream on /api/rx to
+      // receive frames the bridge picked up off the air, and uses POST /api/tx
+      // to transmit composed frames without the operator copy/pasting.
+      //
+      // Loaded from anywhere else (GitHub Pages, file://, mkcert dev server),
+      // /api/health 404s, bridge stays undetected, paste-bridge UX is unchanged.
+      const bridge = {
+        detected: false,
+        station: null,
+        kissConnected: false,
+        connectionState: 'idle', // 'idle' | 'connecting' | 'open' | 'error'
+        lastError: null,
+        buffer: [],
+        eventSource: null,
+        healthTimer: null,
+      };
+
+      async function bridgeProbe() {
+        try {
+          const r = await fetch('/api/health', { cache: 'no-store' });
+          if (!r.ok) return false;
+          const data = await r.json();
+          if (!data || data.bridge !== 'checkpoint-pi-bridge') return false;
+          bridge.detected = true;
+          bridge.station = data.station || null;
+          bridge.kissConnected = !!data.kissConnected;
+          bridge.lastError = data.kissError || null;
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      function bridgeConnectStream() {
+        if (!bridge.detected || bridge.eventSource) return;
+        try {
+          bridge.connectionState = 'connecting';
+          const es = new EventSource('/api/rx');
+          bridge.eventSource = es;
+          es.addEventListener('open', () => {
+            bridge.connectionState = 'open';
+            refreshBridgeUi();
+          });
+          es.addEventListener('message', (ev) => {
+            let payload;
+            try {
+              payload = JSON.parse(ev.data);
+            } catch {
+              return;
+            }
+            if (!payload || typeof payload.frame !== 'string') return;
+            bridge.buffer.push(payload);
+            refreshBridgeUi();
+          });
+          es.addEventListener('error', () => {
+            bridge.connectionState = 'error';
+            refreshBridgeUi();
+            // EventSource auto-reconnects on its own; just reflect status.
+          });
+        } catch (err) {
+          bridge.connectionState = 'error';
+          bridge.lastError = err.message;
+        }
+      }
+
+      async function bridgeRefreshHealth() {
+        if (!bridge.detected) return;
+        try {
+          const r = await fetch('/api/health', { cache: 'no-store' });
+          if (!r.ok) return;
+          const data = await r.json();
+          bridge.kissConnected = !!data.kissConnected;
+          bridge.lastError = data.kissError || null;
+          refreshBridgeUi();
+        } catch {
+          // network blip; ignore
+        }
+      }
+
+      function refreshBridgeUi() {
+        const el = $('radioBridgeStatus');
+        if (!bridge.detected) {
+          el.style.display = 'none';
+        } else {
+          el.style.display = '';
+          let cls = 'radio-bridge';
+          let meta;
+          if (bridge.connectionState === 'open' && bridge.kissConnected) {
+            cls += ' ok';
+            meta = 'bridge online · radio link up';
+          } else if (bridge.connectionState === 'open' && !bridge.kissConnected) {
+            cls += ' warn';
+            meta = 'bridge online · radio link DOWN';
+            if (bridge.lastError) meta += ` (${bridge.lastError})`;
+          } else if (bridge.connectionState === 'connecting') {
+            meta = 'bridge connecting…';
+          } else if (bridge.connectionState === 'error') {
+            cls += ' err';
+            meta = 'bridge stream error — retrying';
+          } else {
+            meta = 'bridge idle';
+          }
+          el.className = cls;
+          $('radioBridgeStation').textContent = bridge.station || 'Bridge';
+          $('radioBridgeMeta').textContent = meta;
+        }
+        // Send-via-radio button visibility
+        const sendBtn = $('radioSendViaRadio');
+        sendBtn.style.display = bridge.detected ? '' : 'none';
+        // Bridge inbox
+        const inbox = $('radioBridgeInbox');
+        if (bridge.buffer.length > 0) {
+          inbox.classList.add('has-frames');
+          $('radioBridgeInboxCount').textContent = String(bridge.buffer.length);
+        } else {
+          inbox.classList.remove('has-frames');
+        }
+      }
+
+      async function bridgeSendPending() {
+        const frames = composeFrames(pendingOutbound());
+        if (frames.length === 0) {
+          toast('Nothing to send');
+          return;
+        }
+        if (!bridge.kissConnected) {
+          toast('Radio link is down — try paste instead');
+          await bridgeRefreshHealth();
+          return;
+        }
+        let sent = 0;
+        let failed = 0;
+        let lastError = null;
+        for (const frame of frames) {
+          try {
+            const r = await fetch('/api/tx', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ frame }),
+            });
+            if (r.ok) {
+              sent++;
+            } else {
+              failed++;
+              const data = await r.json().catch(() => ({}));
+              lastError = data.error || `HTTP ${r.status}`;
+            }
+          } catch (err) {
+            failed++;
+            lastError = err.message;
+          }
+        }
+        if (sent > 0) {
+          // Mirror the "Mark sent" behavior: advance lastSentSeq for this device.
+          const v = state.vector[state.myDevice] || 0;
+          if (v > 0) {
+            state.lastSentSeq[state.myDevice] = v;
+            saveState();
+          }
+        }
+        refreshRadioPanel();
+        const parts = [];
+        if (sent) parts.push(`${sent} sent`);
+        if (failed) parts.push(`${failed} failed (${lastError})`);
+        toast(parts.join(' · ') || 'No frames sent');
+        bridgeRefreshHealth();
+      }
+
+      function bridgeApplyBuffer() {
+        if (bridge.buffer.length === 0) return;
+        const text = bridge.buffer.map((p) => p.frame).join('\n');
+        const r = applyInbound(text);
+        bridge.buffer = [];
+        refreshRadioPanel();
+        const parts = [];
+        if (r.applied) parts.push(r.applied + ' applied');
+        if (r.dedupe) parts.push(r.dedupe + ' duplicate');
+        if (r.collisions) parts.push(r.collisions + ' collision');
+        if (r.errors) parts.push(r.errors + ' error');
+        toast(parts.length ? parts.join(' · ') : 'No frames applied');
+      }
+
+      function bridgeDiscardBuffer() {
+        if (bridge.buffer.length === 0) return;
+        if (
+          !confirm(
+            `Discard ${bridge.buffer.length} frame(s) received via radio without applying? ` +
+              'They will be lost (the sender will need to re-broadcast).'
+          )
+        ) {
+          return;
+        }
+        bridge.buffer = [];
+        refreshRadioPanel();
+      }
+
+      $('radioSendViaRadio').addEventListener('click', bridgeSendPending);
+      $('radioBridgeApply').addEventListener('click', bridgeApplyBuffer);
+      $('radioBridgeDiscard').addEventListener('click', bridgeDiscardBuffer);
+
       // ============ TOAST ============
       let toastTimer = null;
       function toast(msg) {
@@ -2554,6 +2831,16 @@
       // Default the viewed stop to the operator's own stop on boot.
       viewStopId = state.myStop;
       render();
+
+      // Probe for a Pi radio bridge at the current origin (no-op when served
+      // from GitHub Pages or any non-bridge host).
+      bridgeProbe().then((found) => {
+        if (!found) return;
+        bridgeConnectStream();
+        // Periodic health refresh so the modal status reflects KISS/Direwolf
+        // restarts without the operator having to re-open the panel.
+        bridge.healthTimer = setInterval(bridgeRefreshHealth, 15000);
+      });
     </script>
   </body>
 </html>

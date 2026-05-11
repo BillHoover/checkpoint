@@ -1,0 +1,15 @@
+{
+  "name": "checkpoint-pi-bridge",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Per-checkpoint Raspberry Pi (or any Linux/macOS/Windows host) bridge service for the Checkpoint PWA. Serves the PWA over HTTPS, exposes a small REST/SSE API to the in-browser app, and shuttles CKPT/1 frames over RF via Direwolf's KISS-over-TCP interface.",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "config:check": "node -e \"import('./lib/config.mjs').then(m => m.load(process.argv[1] || 'config.json')).then(c => console.log(JSON.stringify(c, null, 2)))\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

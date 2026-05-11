@@ -1,0 +1,37 @@
+{
+  "_comment": "Copy to config.json and edit. See README.md for field meanings.",
+
+  "station": {
+    "callsign": "AJ6UU",
+    "ssid": 1
+  },
+
+  "aprs": {
+    "destination": "APCKPT",
+    "destinationSsid": 0,
+    "digipath": ["WIDE1-1", "WIDE2-1"],
+    "addressee": "CKPT"
+  },
+
+  "https": {
+    "host": "0.0.0.0",
+    "port": 443,
+    "certFile": "certs/fullchain.pem",
+    "keyFile": "certs/privkey.pem"
+  },
+
+  "static": {
+    "root": "..",
+    "_comment_root": "Path (relative to this config file, or absolute) where index.html / sw.js / manifest.json / icons live. '..' means the repo root if this Pi is a checkout of the Checkpoint repo."
+  },
+
+  "kiss": {
+    "host": "127.0.0.1",
+    "port": 8001,
+    "reconnectMs": 3000
+  },
+
+  "log": {
+    "level": "info"
+  }
+}

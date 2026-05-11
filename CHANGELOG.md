@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.0 — 2026-05-10 — Pi radio bridge (Phase 3b groundwork)
+
+- New **`pi/`** subdirectory: a Node service (zero runtime deps) that runs on a per-checkpoint Raspberry Pi (or any Linux/macOS/Windows host) and acts as a radio I/O appliance. It serves the existing PWA over HTTPS from the Pi and shuttles `CKPT/1` frames over RF via Direwolf's KISS-over-TCP interface, so volunteers no longer have to read frames over voice or copy-paste them into a separate radio app.
+- Wire wrapper on RF: CKPT/1 frames go out as **APRS messages addressed to `CKPT     `** (9-char addressee). iGate-forwardable, digipeater-relayable, and the 67-char design constraint was already chosen to fit this exact envelope.
+- New API surface (same-origin from the PWA when loaded from the Pi):
+  - `GET /api/health` — bridge presence + KISS link status + tx/rx counters. PWA feature-detects.
+  - `POST /api/tx` — accepts `{ frame }`, wraps as APRS message, sends via KISS.
+  - `GET /api/rx` — Server-Sent Events stream of received CKPT/1 frames (echoes of our own transmissions are filtered).
+- PWA gains a **Radio Bridge** section in the existing Radio Sync modal when served from a bridge host:
+  - Status line (callsign + connection state).
+  - *Send via radio* button: pushes the current outbound queue out the radio, then advances `lastSentSeq` like *Mark sent*.
+  - *Bridge received N* inbox: collects frames from `/api/rx` between sessions; *Apply all* runs them through the existing inbound applier (deliberate-action UX preserved — no auto-apply).
+  - On non-bridge hosts (GitHub Pages, file://, mkcert dev server), `/api/health` 404s, the bridge is silently undetected, and the paste-bridge UX is exactly as before.
+- Service worker cache bumped to `checkpoint-v5`.
+- See `pi/README.md` for setup: direwolf config, systemd unit, Let's Encrypt DNS-01 cert issuance (the bridge needs real HTTPS — mixed-content rules block an HTTPS PWA from calling an HTTP local API), and notes on hostapd/dnsmasq for the "Pi is the WiFi" topology.
+
 ## 0.3.0 — 2026-05-10 — Radio sync (paste-bridge MVP)
 
 - **Radio Sync** panel — new top-level button in the header. Operators paste pending events into their radio software (Winlink, JS8Call, APRS messaging, …) and paste received frames back into the app. Frames are compact ASCII (≤ 67 chars to fit an APRS message), printable, and human-readable on a radio screen.
