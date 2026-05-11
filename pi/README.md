@@ -81,21 +81,76 @@ We want a real cert so browsers don't nag and EUDs don't have to install a custo
 
 Pick a hostname under a domain you control, e.g. `cp.deadmoose.com`. Point that hostname's A record to the LAN address the Pi will hand out (e.g. `192.168.4.1` if the Pi is the AP, or whatever address it has on the venue's WiFi). Public DNS resolving to a private IP is fine — TLS only checks that the hostname *in the cert* matches the hostname *in the URL bar*. Where DNS resolves to is irrelevant.
 
-The exact ACME client varies by where DNS is hosted. With **Cloudflare**:
+For hands-off renewals you need an ACME client that can write TXT records via a DNS provider's API. **Network Solutions, GoDaddy, IONOS, and most low-end registrars do *not* expose a usable API**, so if your domain lives there you have two clean paths:
+
+### Path A — move DNS hosting to Cloudflare (recommended)
+
+Keeps the domain *registered* wherever it is (Network Solutions, etc.); only the DNS *hosting* moves. Free, 5-minute setup, then fully unattended renewals forever.
+
+1. At Cloudflare, add `deadmoose.com` as a Free zone. Copy the two nameservers Cloudflare gives you.
+2. At your registrar (Network Solutions in this repo's case): Account → Manage → Change Where Domain Points → Custom DNS Servers → paste the Cloudflare NS names → save. Propagation is usually 15-60 min.
+3. At Cloudflare, recreate any DNS records you care about (the A record for `cp.deadmoose.com` pointing to the Pi's LAN IP, etc.).
+4. At Cloudflare → My Profile → API Tokens → Create Token, use the "Edit zone DNS" template, scope to `deadmoose.com`.
+5. On the Pi:
 
 ```sh
 sudo apt install certbot python3-certbot-dns-cloudflare
-# Put a Cloudflare API token (Zone:DNS Edit on the deadmoose.com zone) in
-# ~/.secrets/cloudflare.ini with mode 600.
+sudo mkdir -p /etc/letsencrypt/secrets
+sudo bash -c 'cat > /etc/letsencrypt/secrets/cloudflare.ini <<EOF
+dns_cloudflare_api_token = PASTE_TOKEN_HERE
+EOF'
+sudo chmod 600 /etc/letsencrypt/secrets/cloudflare.ini
+
 sudo certbot certonly \
   --dns-cloudflare \
-  --dns-cloudflare-credentials ~/.secrets/cloudflare.ini \
+  --dns-cloudflare-credentials /etc/letsencrypt/secrets/cloudflare.ini \
   -d cp.deadmoose.com
 ```
 
-With **Route53** use `--dns-route53`; with self-hosted DNS use `--manual --preferred-challenges dns` and add the TXT records by hand once every 60 days. The lightweight alternative is [`acme.sh`](https://github.com/acmesh-official/acme.sh) which supports dozens of providers.
+`certbot renew` from cron handles the 90-day rollover untouched.
 
-Copy or symlink the issued files into `pi/certs/`:
+### Path B — keep DNS at Network Solutions, use acme.sh DNS alias mode
+
+For when you'd rather not move nameservers. Touches Network Solutions exactly once (to set a single CNAME that never changes again), then all future TXT writes happen at an API-capable DNS provider for a *different* domain you set up just for ACME aliasing.
+
+1. Sign up at [deSEC.io](https://desec.io/) — free, API-driven, designed exactly for this. Create a domain like `aliases.deadmoose.org` (any zone you control will do; deSEC gives you `.dedyn.io` subdomains for free if you prefer). Get an API token.
+2. At Network Solutions, create **one CNAME** in the `deadmoose.com` zone:
+   ```
+   _acme-challenge.cp.deadmoose.com  CNAME  cp.aliases.deadmoose.org
+   ```
+   That CNAME never changes for the lifetime of the setup.
+3. On the Pi:
+
+```sh
+curl https://get.acme.sh | sh -s email=you@example.com
+export DEDYN_TOKEN="..."         # deSEC token (env var name depends on provider plugin)
+~/.acme.sh/acme.sh --issue \
+  -d cp.deadmoose.com \
+  --challenge-alias aliases.deadmoose.org \
+  --dns dns_desec
+```
+
+acme.sh writes the per-challenge TXT to `_acme-challenge.cp.aliases.deadmoose.org` via the deSEC API, LE follows the CNAME from Network Solutions, validates against the alias zone, issues the cert. Renewals work the same way with no further DNS edits anywhere.
+
+acme.sh installs its own cron entry for renewal.
+
+### Path C — manual paste (no automation, fine for one Pi)
+
+If you're running one Pi for one event and don't mind a calendar reminder:
+
+```sh
+sudo certbot certonly --manual --preferred-challenges dns -d cp.deadmoose.com
+# certbot prints a TXT value; paste into Network Solutions' Advanced DNS panel,
+# wait ~5 min, hit Enter. Repeat every 60-90 days.
+```
+
+### Note on "DNS persist mode"
+
+[`acme.sh`'s DNS persist mode](https://github.com/acmesh-official/acme.sh/wiki/DNS-persist-mode) (one TXT record, set once, used forever — no per-issuance edits) implements `draft-ietf-acme-dns-persist-01`. The draft is **not yet implemented by any production CA** (Let's Encrypt, ZeroSSL, Buypass, etc.). It'll be the obvious answer when CAs adopt it, but isn't usable today.
+
+### Install the cert files
+
+However you got the cert, copy or symlink the issued files into `pi/certs/`:
 
 ```sh
 mkdir -p pi/certs
@@ -103,7 +158,9 @@ sudo ln -s /etc/letsencrypt/live/cp.deadmoose.com/fullchain.pem pi/certs/fullcha
 sudo ln -s /etc/letsencrypt/live/cp.deadmoose.com/privkey.pem pi/certs/privkey.pem
 ```
 
-Renewal: LE certs are 90 days. `certbot renew` from cron handles it. Restart the bridge after renewal so it re-reads the cert files.
+(For acme.sh, the issued files live under `~/.acme.sh/cp.deadmoose.com_ecc/` or similar; symlink from there.)
+
+Renewal: LE certs are 90 days. `certbot renew` (Path A/C) or acme.sh's cron (Path B) handles it automatically. Restart the bridge after renewal so it re-reads the cert files (`systemctl reload checkpoint-bridge` if you've set up the unit per Step 4, or use a post-renew hook).
 
 ## Step 3 — configure the bridge
 
