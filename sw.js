@@ -1,5 +1,5 @@
 // Checkpoint - offline service worker
-const CACHE = 'checkpoint-v6';
+const CACHE = 'checkpoint-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -9,21 +9,21 @@ const ASSETS = [
   './icon-512-maskable.png',
 ];
 
-self.addEventListener('install', (e) => {
+globalThis.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS).catch(() => {})));
-  self.skipWaiting();
+  globalThis.skipWaiting();
 });
 
-self.addEventListener('activate', (e) => {
+globalThis.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
   );
-  self.clients.claim();
+  globalThis.clients.claim();
 });
 
-self.addEventListener('fetch', (e) => {
+globalThis.addEventListener('fetch', (e) => {
   // Cache-first: works fully offline after first load
   if (e.request.method !== 'GET') return;
   e.respondWith(

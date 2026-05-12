@@ -1194,7 +1194,7 @@
         let h, m;
         if (s.includes(':')) {
           const parts = s.split(':').map((p) => Number.parseInt(p, 10));
-          if (parts.length < 2 || parts.slice(0, 2).some(isNaN)) return null;
+          if (parts.length < 2 || parts.slice(0, 2).some(Number.isNaN)) return null;
           h = parts[0];
           m = parts[1];
         } else {
@@ -1221,8 +1221,8 @@
 
       function crc16(s) {
         let crc = 0xffff;
-        for (let i = 0; i < s.length; i++) {
-          crc ^= s.charCodeAt(i) << 8;
+        for (const ch of s) {
+          crc ^= ch.codePointAt(0) << 8;
           for (let b = 0; b < 8; b++) {
             crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
           }
@@ -1236,8 +1236,7 @@
         if (!name) return '';
         const bytes = new TextEncoder().encode(String(name));
         let out = '';
-        for (let i = 0; i < bytes.length; i++) {
-          const b = bytes[i];
+        for (const b of bytes) {
           if (
             (b >= 0x30 && b <= 0x39) || // 0-9
             (b >= 0x41 && b <= 0x5a) || // A-Z
@@ -1245,7 +1244,7 @@
             b === 0x2e || // .
             b === 0x2d // -
           ) {
-            out += String.fromCharCode(b);
+            out += String.fromCodePoint(b);
           } else if (b === 0x20) {
             out += '_';
           } else {
@@ -1269,7 +1268,7 @@
             }
           }
           if (c === '_') bytes.push(0x20);
-          else bytes.push(c.charCodeAt(0));
+          else bytes.push(c.codePointAt(0));
         }
         return new TextDecoder().decode(new Uint8Array(bytes));
       }
@@ -1341,7 +1340,7 @@
         let i = start;
         let n = 0;
         while (i < tok.length && tok[i] >= '0' && tok[i] <= '9') {
-          n = n * 10 + (tok.charCodeAt(i) - 48);
+          n = n * 10 + (tok.codePointAt(i) - 48);
           i++;
         }
         return { value: n, next: i, consumed: i - start };
@@ -1989,28 +1988,25 @@
 
       $('rosterImport').addEventListener('click', () => $('rosterFile').click());
 
-      $('rosterFile').addEventListener('change', (e) => {
+      $('rosterFile').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const lines = ev.target.result.split(/\r?\n/).filter((l) => l.trim());
-          $('rosterList').innerHTML = '';
-          let added = 0;
-          lines.forEach((line, idx) => {
-            const parts = parseCSVLine(line);
-            // Skip a header row whose first column is non-numeric (e.g. "Number,Name").
-            if (idx === 0 && /[a-zA-Z]/.test(parts[0] || '')) return;
-            const num = Number.parseInt(parts[0], 10);
-            if (Number.isNaN(num)) return;
-            addRosterRow(num, (parts[1] || '').trim());
-            added++;
-          });
-          if (added === 0) addRosterRow(1, '');
-          toast(`Imported ${added} rows`);
-          e.target.value = '';
-        };
-        reader.readAsText(file);
+        const text = await file.text();
+        const lines = text.split(/\r?\n/).filter((l) => l.trim());
+        $('rosterList').innerHTML = '';
+        let added = 0;
+        lines.forEach((line, idx) => {
+          const parts = parseCSVLine(line);
+          // Skip a header row whose first column is non-numeric (e.g. "Number,Name").
+          if (idx === 0 && /[a-zA-Z]/.test(parts[0] || '')) return;
+          const num = Number.parseInt(parts[0], 10);
+          if (Number.isNaN(num)) return;
+          addRosterRow(num, (parts[1] || '').trim());
+          added++;
+        });
+        if (added === 0) addRosterRow(1, '');
+        toast(`Imported ${added} rows`);
+        e.target.value = '';
       });
 
       // ============ EXPORT ============
@@ -2050,7 +2046,7 @@
                 let s = String(cell == null ? '' : cell);
                 // CSV-injection guard: spreadsheets evaluate cells starting with these as formulas.
                 if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+                return /[",\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s;
               })
               .join(',')
           )
@@ -2257,7 +2253,7 @@
             new Date(e.recordedAt).toISOString(),
             e.kind,
             e.rider,
-            e.stop != null ? e.stop : '',
+            e.stop ?? '',
             e.hhmm ? formatHHMM(e.hhmm) : '',
             e.name || '',
           ]);
@@ -2268,7 +2264,7 @@
               .map((cell) => {
                 let s = String(cell == null ? '' : cell);
                 if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-                return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+                return /[",\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s;
               })
               .join(',')
           )

@@ -40,7 +40,7 @@ function writeAddress(out, off, call, ssid, { c, h, last }) {
   if (!/^[A-Z0-9]{1,6}$/.test(call)) throw new Error(`bad callsign: ${call}`);
   const padded = call.padEnd(CALLSIGN_PAD, ' ');
   for (let i = 0; i < CALLSIGN_PAD; i++) {
-    out[off + i] = (padded.charCodeAt(i) << 1) & 0xff;
+    out[off + i] = (padded.codePointAt(i) << 1) & 0xff;
   }
   // SSID byte
   let byte = RR_BITS | ((ssid & 0x0f) << 1);
@@ -56,7 +56,7 @@ function readAddress(buf, off) {
   let call = '';
   for (let i = 0; i < CALLSIGN_PAD; i++) {
     const ch = (buf[off + i] >> 1) & 0x7f;
-    if (ch !== 0x20) call += String.fromCharCode(ch);
+    if (ch !== 0x20) call += String.fromCodePoint(ch);
   }
   const ssidByte = buf[off + CALLSIGN_PAD];
   return {

@@ -35,8 +35,7 @@ function escape(buf) {
   // Pessimistic allocation: worst case every byte is escaped (doubled).
   const out = Buffer.alloc(buf.length * 2);
   let n = 0;
-  for (let i = 0; i < buf.length; i++) {
-    const b = buf[i];
+  for (const b of buf) {
     if (b === FEND) {
       out[n++] = FESC;
       out[n++] = TFEND;

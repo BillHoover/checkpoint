@@ -55,7 +55,7 @@ function validateAprs(a) {
     fail('aprs.destinationSsid must be 0..15');
   const digipath = Array.isArray(a.digipath) ? a.digipath.map(String) : [];
   for (const hop of digipath) {
-    if (!/^[A-Z0-9]{1,6}(-(1[0-5]|[0-9]))?$/.test(hop))
+    if (!/^[A-Z0-9]{1,6}(-(1[0-5]|\d))?$/.test(hop))
       fail(`aprs.digipath entry ${JSON.stringify(hop)} is not a valid AX.25 callsign[-ssid]`);
   }
   const addressee = String(a.addressee || 'CKPT').toUpperCase();
