@@ -104,3 +104,4 @@ The keypad accepts: `14:35`, `1435`, `935`, `9:5` (zero-padded automatically). A
 - Saved in `localStorage` under `checkpoint.state.v2` (single key, contains stops, riders, the event log, and settings). The legacy `checkpoint.riders.v1` and `checkpoint.settings.v1` keys are left in place as a one-version backup if you upgraded from v0.1.x.
 - **Per-device, per-browser.** Clearing browser data or uninstalling the PWA loses local data — **export first.**
 - Nothing is sent to any server unless you explicitly use Email or Sheets sync.
+
