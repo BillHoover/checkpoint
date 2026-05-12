@@ -216,8 +216,9 @@ function handleStatic(pathname, req, res) {
   }
   let resolved = pathname;
   if (resolved.endsWith('/')) resolved += 'index.html';
-  const filePath = path.join(cfg.static.root, resolved);
-  if (!filePath.startsWith(cfg.static.root)) {
+  const filePath = path.resolve(cfg.static.root, '.' + resolved);
+  const rel = path.relative(cfg.static.root, filePath);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) {
     res.statusCode = 403;
     return res.end('forbidden');
   }

@@ -218,8 +218,6 @@
         0% {
           background: var(--accent);
         }
-        100% {
-        }
       }
       .time-cell.flash {
         animation: flash 0.4s ease-out;
@@ -254,7 +252,8 @@
         letter-spacing: 1px;
         color: var(--accent);
       }
-      .modal label {
+      .modal label,
+      .modal .section-label {
         display: block;
         font-size: 11px;
         color: var(--text-dim);
@@ -792,7 +791,7 @@
       <div class="modal" style="max-width: 480px">
         <h3>Settings</h3>
 
-        <label>Stops</label>
+        <div class="section-label">Stops</div>
         <div class="hint">
           Stops along the course. All operators on this event should configure the same list with
           matching ids during the pre-event briefing.
@@ -932,7 +931,7 @@
           <span class="meta" id="radioBridgeMeta">checking…</span>
         </div>
 
-        <label>Outbound — paste these into your radio software</label>
+        <label for="radioOutbound">Outbound — paste these into your radio software</label>
         <textarea
           id="radioOutbound"
           class="radio-frame-box"
@@ -971,7 +970,7 @@
           <button id="radioBridgeDiscard">Discard</button>
         </div>
 
-        <label>Known peers</label>
+        <div class="section-label">Known peers</div>
         <div id="radioPeers" class="radio-peers"></div>
 
         <div class="modal-actions">
@@ -1180,9 +1179,9 @@
       }
       const ymdToday = () => ymdFromMs(Date.now());
       function dateMidnightMs(yyyymmdd) {
-        const y = parseInt(yyyymmdd.slice(0, 4), 10);
-        const m = parseInt(yyyymmdd.slice(4, 6), 10);
-        const d = parseInt(yyyymmdd.slice(6, 8), 10);
+        const y = Number.parseInt(yyyymmdd.slice(0, 4), 10);
+        const m = Number.parseInt(yyyymmdd.slice(4, 6), 10);
+        const d = Number.parseInt(yyyymmdd.slice(6, 8), 10);
         return new Date(y, m - 1, d).getTime();
       }
 
@@ -1194,21 +1193,21 @@
         if (!s) return null;
         let h, m;
         if (s.includes(':')) {
-          const parts = s.split(':').map((p) => parseInt(p, 10));
+          const parts = s.split(':').map((p) => Number.parseInt(p, 10));
           if (parts.length < 2 || parts.slice(0, 2).some(isNaN)) return null;
           h = parts[0];
           m = parts[1];
         } else {
-          const digits = s.replace(/[^0-9]/g, '');
+          const digits = s.replace(/\D/g, '');
           if (digits.length === 3) {
-            h = parseInt(digits.slice(0, 1), 10);
-            m = parseInt(digits.slice(1, 3), 10);
+            h = Number.parseInt(digits.slice(0, 1), 10);
+            m = Number.parseInt(digits.slice(1, 3), 10);
           } else if (digits.length === 4) {
-            h = parseInt(digits.slice(0, 2), 10);
-            m = parseInt(digits.slice(2, 4), 10);
+            h = Number.parseInt(digits.slice(0, 2), 10);
+            m = Number.parseInt(digits.slice(2, 4), 10);
           } else return null;
         }
-        if (isNaN(h) || isNaN(m)) return null;
+        if (Number.isNaN(h) || Number.isNaN(m)) return null;
         if (h < 0 || h > 23 || m < 0 || m > 59) return null;
         return pad(h) + pad(m);
       }
@@ -1262,8 +1261,8 @@
           const c = encoded[i];
           if (c === '%' && i + 2 < encoded.length) {
             const hex = encoded.substr(i + 1, 2);
-            const b = parseInt(hex, 16);
-            if (!isNaN(b) && /^[0-9A-Fa-f]{2}$/.test(hex)) {
+            const b = Number.parseInt(hex, 16);
+            if (!Number.isNaN(b) && /^[0-9A-Fa-f]{2}$/.test(hex)) {
               bytes.push(b);
               i += 2;
               continue;
@@ -1279,12 +1278,12 @@
       // integer; only ±1 is encodable per spec, callers split frames otherwise.
       function dayOffsetVsFrame(event, frameDate) {
         const ev = ymdFromMs(event.recordedAt);
-        const fy = parseInt(frameDate.slice(0, 4), 10);
-        const fm = parseInt(frameDate.slice(4, 6), 10);
-        const fd = parseInt(frameDate.slice(6, 8), 10);
-        const ey = parseInt(ev.slice(0, 4), 10);
-        const em = parseInt(ev.slice(4, 6), 10);
-        const ed = parseInt(ev.slice(6, 8), 10);
+        const fy = Number.parseInt(frameDate.slice(0, 4), 10);
+        const fm = Number.parseInt(frameDate.slice(4, 6), 10);
+        const fd = Number.parseInt(frameDate.slice(6, 8), 10);
+        const ey = Number.parseInt(ev.slice(0, 4), 10);
+        const em = Number.parseInt(ev.slice(4, 6), 10);
+        const ed = Number.parseInt(ev.slice(6, 8), 10);
         return Math.round((new Date(ey, em - 1, ed) - new Date(fy, fm - 1, fd)) / 86400000);
       }
 
@@ -1306,8 +1305,7 @@
         const origin = events[0].origin;
         const seqStart = events[0].seq;
         const seqEnd = events[events.length - 1].seq;
-        const frameStop =
-          opts.stop != null ? opts.stop : events[0].stop != null ? events[0].stop : 1;
+        const frameStop = opts.stop ?? events[0].stop ?? 1;
         const frameDate = opts.date || ymdToday();
         const tokens = events.map((e) => encodeEventToken(e, frameStop, frameDate)).join(' ');
         const body =
@@ -1333,89 +1331,160 @@
         if (!s || !s.startsWith(prefix)) return null;
         const v = s.slice(prefix.length);
         if (key === 'O' || key === 'S' || key === 'F') {
-          const n = parseInt(v, 10);
-          return isNaN(n) ? null : n;
+          const n = Number.parseInt(v, 10);
+          return Number.isNaN(n) ? null : n;
         }
         return v;
       }
 
-      function parseEventToken(tok, ctx) {
-        let i = 0;
-        while (i < tok.length && tok[i] >= '0' && tok[i] <= '9') i++;
-        if (i === 0) return { error: 'no rider digits' };
-        const rider = parseInt(tok.slice(0, i), 10);
-        if (i >= tok.length) return { error: 'truncated event' };
-        const kind = tok[i];
-        i++;
-
-        if (kind === 'R') {
-          const name = decodeName(tok.slice(i));
-          if (name.length === 0) return { error: 'empty roster name' };
-          if (new TextEncoder().encode(name).length > 60) {
-            return { error: 'roster name > 60 bytes' };
-          }
-          return {
-            origin: ctx.origin,
-            seq: ctx.seq,
-            kind: 'R',
-            rider,
-            stop: ctx.stop,
-            hhmm: null,
-            name,
-            recordedAt: dateMidnightMs(ctx.date),
-          };
+      function readDigitRun(tok, start) {
+        let i = start;
+        let n = 0;
+        while (i < tok.length && tok[i] >= '0' && tok[i] <= '9') {
+          n = n * 10 + (tok.charCodeAt(i) - 48);
+          i++;
         }
+        return { value: n, next: i, consumed: i - start };
+      }
 
-        if (!'ADZY'.includes(kind)) {
-          // Unknown timed kind — receiver MUST ignore but seq accounting still applies.
-          return { unknownKind: true, origin: ctx.origin, seq: ctx.seq, kind, rider };
+      function parseRosterToken(tok, i, rider, ctx) {
+        const name = decodeName(tok.slice(i));
+        if (name.length === 0) return { error: 'empty roster name' };
+        if (new TextEncoder().encode(name).length > 60) {
+          return { error: 'roster name > 60 bytes' };
         }
-        if (i + 4 > tok.length) return { error: 'truncated hhmm' };
-        const hhmm = tok.slice(i, i + 4);
-        if (!/^\d{4}$/.test(hhmm)) return { error: 'bad hhmm' };
-        const hh = parseInt(hhmm.slice(0, 2), 10);
-        const mm = parseInt(hhmm.slice(2, 4), 10);
-        if (hh > 23 || mm > 59) return { error: 'hhmm out of range' };
-        i += 4;
+        return {
+          origin: ctx.origin,
+          seq: ctx.seq,
+          kind: 'R',
+          rider,
+          stop: ctx.stop,
+          hhmm: null,
+          name,
+          recordedAt: dateMidnightMs(ctx.date),
+        };
+      }
 
-        let stop = ctx.stop;
+      function parseDayOffsetSuffix(tok, i) {
+        const sign = tok[i];
+        if (sign !== '+' && sign !== '-') return { error: 'bad day-offset sign' };
+        const d = readDigitRun(tok, i + 1);
+        if (d.value !== 1) return { error: 'day offset must be 1 in v1' };
+        return { dayOffset: sign === '+' ? 1 : -1, next: d.next };
+      }
+
+      function parseStopSuffix(tok, i) {
+        const d = readDigitRun(tok, i);
+        if (d.consumed === 0 || d.value < 1 || d.value > 99) {
+          return { error: 'bad stop override' };
+        }
+        return { stop: d.value, next: d.next };
+      }
+
+      function parseTimedSuffixes(tok, startI, defaultStop) {
+        let i = startI;
+        let stop = defaultStop;
         let dayOffset = 0;
         while (i < tok.length) {
           if (tok[i] !== '/') return { error: 'expected /' };
           i++;
           if (tok[i] === 'd') {
-            i++;
-            const sign = tok[i];
-            if (sign !== '+' && sign !== '-') return { error: 'bad day-offset sign' };
-            i++;
-            let n = 0;
-            while (i < tok.length && tok[i] >= '0' && tok[i] <= '9') {
-              n = n * 10 + (tok.charCodeAt(i) - 48);
-              i++;
-            }
-            if (n !== 1) return { error: 'day offset must be 1 in v1' };
-            dayOffset = sign === '+' ? 1 : -1;
+            const r = parseDayOffsetSuffix(tok, i + 1);
+            if (r.error) return r;
+            dayOffset = r.dayOffset;
+            i = r.next;
           } else {
-            let n = 0;
-            const startI = i;
-            while (i < tok.length && tok[i] >= '0' && tok[i] <= '9') {
-              n = n * 10 + (tok.charCodeAt(i) - 48);
-              i++;
-            }
-            if (i === startI || n < 1 || n > 99) return { error: 'bad stop override' };
-            stop = n;
+            const r = parseStopSuffix(tok, i);
+            if (r.error) return r;
+            stop = r.stop;
+            i = r.next;
           }
         }
+        return { stop, dayOffset };
+      }
+
+      function parseTimedToken(tok, startI, rider, kind, ctx) {
+        if (startI + 4 > tok.length) return { error: 'truncated hhmm' };
+        const hhmm = tok.slice(startI, startI + 4);
+        if (!/^\d{4}$/.test(hhmm)) return { error: 'bad hhmm' };
+        const hh = Number.parseInt(hhmm.slice(0, 2), 10);
+        const mm = Number.parseInt(hhmm.slice(2, 4), 10);
+        if (hh > 23 || mm > 59) return { error: 'hhmm out of range' };
+        const suffix = parseTimedSuffixes(tok, startI + 4, ctx.stop);
+        if (suffix.error) return suffix;
         return {
           origin: ctx.origin,
           seq: ctx.seq,
           kind,
           rider,
-          stop,
+          stop: suffix.stop,
           hhmm,
           recordedAt:
-            dateMidnightMs(ctx.date) + dayOffset * 86400000 + (hh * 3600 + mm * 60) * 1000,
+            dateMidnightMs(ctx.date) + suffix.dayOffset * 86400000 + (hh * 3600 + mm * 60) * 1000,
         };
+      }
+
+      function parseEventToken(tok, ctx) {
+        const head = readDigitRun(tok, 0);
+        if (head.consumed === 0) return { error: 'no rider digits' };
+        if (head.next >= tok.length) return { error: 'truncated event' };
+        const rider = head.value;
+        const kind = tok[head.next];
+        const i = head.next + 1;
+
+        if (kind === 'R') return parseRosterToken(tok, i, rider, ctx);
+        if (!'ADZY'.includes(kind)) {
+          // Unknown timed kind — receiver MUST ignore but seq accounting still applies.
+          return { unknownKind: true, origin: ctx.origin, seq: ctx.seq, kind, rider };
+        }
+        return parseTimedToken(tok, i, rider, kind, ctx);
+      }
+
+      function decodeBeaconBody(rest) {
+        if (rest.length < 3) return { error: 'short beacon' };
+        const sender = parseKV(rest[1], 'F');
+        const stop = parseKV(rest[2], 'S');
+        if (sender == null || stop == null) return { error: 'bad beacon header' };
+        const vector = {};
+        for (let i = 3; i < rest.length; i++) {
+          const parts = rest[i].split('/');
+          if (parts.length !== 2) return { error: 'bad beacon vector' };
+          const oi = Number.parseInt(parts[0], 10);
+          const si = Number.parseInt(parts[1], 10);
+          if (Number.isNaN(oi) || Number.isNaN(si)) return { error: 'bad beacon vector' };
+          vector[oi] = si;
+        }
+        return { type: 'beacon', sender, stop, vector };
+      }
+
+      function decodeDataBody(rest) {
+        if (rest.length < 5) return { error: 'short data frame' };
+        const origin = parseKV(rest[0], 'O');
+        const stop = parseKV(rest[1], 'S');
+        const date = parseKV(rest[2], 'D');
+        const seqRange = parseKV(rest[3], 'N');
+        if (origin == null || stop == null || !date || !seqRange) {
+          return { error: 'bad data header' };
+        }
+        if (!/^\d{8}$/.test(date)) return { error: 'bad date' };
+        const m = seqRange.match(/^(\d+)-(\d+)$/);
+        if (!m) return { error: 'bad seq range' };
+        const seqStart = Number.parseInt(m[1], 10);
+        const seqEnd = Number.parseInt(m[2], 10);
+        if (seqEnd < seqStart) return { error: 'inverted seq range' };
+
+        const tokens = rest.slice(4);
+        const expected = seqEnd - seqStart + 1;
+        if (tokens.length !== expected) {
+          return { error: 'event count ' + tokens.length + ' != range ' + expected };
+        }
+        const events = [];
+        for (let i = 0; i < tokens.length; i++) {
+          const ev = parseEventToken(tokens[i], { origin, seq: seqStart + i, stop, date });
+          if (ev.error) return { error: 'event seq ' + (seqStart + i) + ': ' + ev.error };
+          events.push(ev);
+        }
+        return { type: 'data', origin, stop, date, seqStart, seqEnd, events };
       }
 
       function decodeFrame(line) {
@@ -1428,56 +1497,8 @@
         if (!/^[0-9A-F]{4}$/.test(crcStr)) return { error: 'bad CRC format' };
         if (crc16(body) !== crcStr) return { error: 'CRC mismatch' };
 
-        const fields = body.trim().split(/\s+/);
-        const rest = fields.slice(1);
-        if (rest[0] === 'B') {
-          if (rest.length < 3) return { error: 'short beacon' };
-          const sender = parseKV(rest[1], 'F');
-          const stop = parseKV(rest[2], 'S');
-          if (sender == null || stop == null) return { error: 'bad beacon header' };
-          const vector = {};
-          for (let i = 3; i < rest.length; i++) {
-            const parts = rest[i].split('/');
-            if (parts.length !== 2) return { error: 'bad beacon vector' };
-            const oi = parseInt(parts[0], 10);
-            const si = parseInt(parts[1], 10);
-            if (isNaN(oi) || isNaN(si)) return { error: 'bad beacon vector' };
-            vector[oi] = si;
-          }
-          return { type: 'beacon', sender, stop, vector };
-        }
-        if (rest.length < 5) return { error: 'short data frame' };
-        const origin = parseKV(rest[0], 'O');
-        const stop = parseKV(rest[1], 'S');
-        const date = parseKV(rest[2], 'D');
-        const seqRange = parseKV(rest[3], 'N');
-        if (origin == null || stop == null || !date || !seqRange) {
-          return { error: 'bad data header' };
-        }
-        if (!/^\d{8}$/.test(date)) return { error: 'bad date' };
-        const m = seqRange.match(/^(\d+)-(\d+)$/);
-        if (!m) return { error: 'bad seq range' };
-        const seqStart = parseInt(m[1], 10);
-        const seqEnd = parseInt(m[2], 10);
-        if (seqEnd < seqStart) return { error: 'inverted seq range' };
-
-        const tokens = rest.slice(4);
-        const expected = seqEnd - seqStart + 1;
-        if (tokens.length !== expected) {
-          return { error: 'event count ' + tokens.length + ' != range ' + expected };
-        }
-        const events = [];
-        for (let i = 0; i < tokens.length; i++) {
-          const ev = parseEventToken(tokens[i], {
-            origin,
-            seq: seqStart + i,
-            stop,
-            date,
-          });
-          if (ev.error) return { error: 'event seq ' + (seqStart + i) + ': ' + ev.error };
-          events.push(ev);
-        }
-        return { type: 'data', origin, stop, date, seqStart, seqEnd, events };
+        const rest = body.trim().split(/\s+/).slice(1);
+        return rest[0] === 'B' ? decodeBeaconBody(rest) : decodeDataBody(rest);
       }
 
       // ============ RADIO SYNC: COMPOSE / APPLY ============
@@ -1490,41 +1511,41 @@
 
       // Greedy splitter: emits the longest prefix that fits FRAME_MAX_CHARS, then repeats.
       // Events MUST come from a single origin and be in contiguous-seq order.
+      function eventFitsFrame(ev, today) {
+        return ev.kind === 'R' || Math.abs(dayOffsetVsFrame(ev, today)) <= 1;
+      }
+
+      function findFrameEnd(events, start, frameStop, today) {
+        let lastValid = start;
+        let j = start + 1;
+        while (j < events.length && eventFitsFrame(events[j], today)) {
+          const candidate = encodeFrame(events.slice(start, j + 1), {
+            stop: frameStop,
+            date: today,
+          });
+          if (candidate.length > FRAME_MAX_CHARS) break;
+          lastValid = j;
+          j++;
+        }
+        return lastValid;
+      }
+
       function composeFrames(events) {
         if (events.length === 0) return [];
         const frames = [];
         let i = 0;
         const today = ymdToday();
         while (i < events.length) {
-          const start = i;
-          const frameStop = events[start].stop != null ? events[start].stop : state.myStop;
           // Skip events whose date can't be expressed via /d±1 from today's frame date —
           // shouldn't happen for our own newly-recorded events, but defensive.
-          if (events[start].kind !== 'R' && Math.abs(dayOffsetVsFrame(events[start], today)) > 1) {
+          if (!eventFitsFrame(events[i], today)) {
             i++;
             continue;
           }
-          let lastValid = start;
-          let j = start + 1;
-          while (j < events.length) {
-            if (events[j].kind !== 'R' && Math.abs(dayOffsetVsFrame(events[j], today)) > 1) {
-              break;
-            }
-            const candidate = encodeFrame(events.slice(start, j + 1), {
-              stop: frameStop,
-              date: today,
-            });
-            if (candidate.length > FRAME_MAX_CHARS) break;
-            lastValid = j;
-            j++;
-          }
-          frames.push(
-            encodeFrame(events.slice(start, lastValid + 1), {
-              stop: frameStop,
-              date: today,
-            })
-          );
-          i = lastValid + 1;
+          const frameStop = events[i].stop ?? state.myStop;
+          const end = findFrameEnd(events, i, frameStop, today);
+          frames.push(encodeFrame(events.slice(i, end + 1), { stop: frameStop, date: today }));
+          i = end + 1;
         }
         return frames;
       }
@@ -1600,51 +1621,46 @@
       }
 
       // Apply everything pasted into the inbound textbox. Returns counters.
+      function applyDecodedFrame(decoded, counters) {
+        if (decoded.type === 'beacon') {
+          // Phase 2 will use beacon vectors for retransmit prompts; for now just track presence.
+          state.peers[decoded.sender] = { stop: decoded.stop, lastHeardAt: Date.now() };
+          return;
+        }
+        state.peers[decoded.origin] = { stop: decoded.stop, lastHeardAt: Date.now() };
+        for (const ev of decoded.events) {
+          if (ev.unknownKind) continue;
+          const r = applyEvent(ev);
+          if (r === 'applied' || r === 'pending') counters.applied++;
+          else if (r === 'dedupe') counters.dedupe++;
+          else if (r === 'collision') counters.collisions++;
+        }
+      }
+
       function applyInbound(text) {
         const lines = text
           .split(/\r?\n/)
           .map((l) => l.trim())
           .filter(Boolean);
-        let applied = 0,
-          dedupe = 0,
-          errors = 0,
-          collisions = 0;
+        const c = { applied: 0, dedupe: 0, errors: 0, collisions: 0 };
         const errorLines = [];
         for (const line of lines) {
           if (!line.startsWith(FRAME_MAGIC)) {
-            errors++;
+            c.errors++;
             errorLines.push('non-checkpoint line skipped');
             continue;
           }
           const decoded = decodeFrame(line);
           if (decoded.error) {
-            errors++;
+            c.errors++;
             errorLines.push(decoded.error);
             continue;
           }
-          if (decoded.type === 'beacon') {
-            // Phase 2 will use beacon vectors for retransmit prompts; for now just track presence.
-            state.peers[decoded.sender] = {
-              stop: decoded.stop,
-              lastHeardAt: Date.now(),
-            };
-            continue;
-          }
-          state.peers[decoded.origin] = {
-            stop: decoded.stop,
-            lastHeardAt: Date.now(),
-          };
-          for (const ev of decoded.events) {
-            if (ev.unknownKind) continue;
-            const r = applyEvent(ev);
-            if (r === 'applied' || r === 'pending') applied++;
-            else if (r === 'dedupe') dedupe++;
-            else if (r === 'collision') collisions++;
-          }
+          applyDecodedFrame(decoded, c);
         }
         saveState();
         render();
-        return { applied, dedupe, errors, collisions, errorLines };
+        return { ...c, errorLines };
       }
 
       // ============ RENDERING ============
@@ -1774,7 +1790,7 @@
       }
 
       function recordCurrentTime(cell) {
-        const num = parseInt(cell.dataset.num, 10);
+        const num = Number.parseInt(cell.dataset.num, 10);
         const field = cell.dataset.field;
         const r = state.riders.find((x) => x.num === num);
         if (!r) return;
@@ -1794,7 +1810,7 @@
       }
 
       function openTimeModal(cell) {
-        const num = parseInt(cell.dataset.num, 10);
+        const num = Number.parseInt(cell.dataset.num, 10);
         const field = cell.dataset.field;
         const r = state.riders.find((x) => x.num === num);
         if (!r) return;
@@ -1823,14 +1839,10 @@
         if (!editing) return;
         const r = state.riders.find((x) => x.num === editing.num);
         if (!r) return;
-        const kind =
-          parsed === null
-            ? editing.field === 'arrival'
-              ? 'Z'
-              : 'Y'
-            : editing.field === 'arrival'
-              ? 'A'
-              : 'D';
+        const isArrival = editing.field === 'arrival';
+        let kind;
+        if (parsed === null) kind = isArrival ? 'Z' : 'Y';
+        else kind = isArrival ? 'A' : 'D';
         appendEvent({
           kind,
           rider: editing.num,
@@ -1863,7 +1875,7 @@
 
       // Stop-switcher dropdown change.
       function onStopSelectChange(e) {
-        viewStopId = parseInt(e.target.value, 10);
+        viewStopId = Number.parseInt(e.target.value, 10);
         render();
       }
 
@@ -1893,8 +1905,8 @@
       $('rosterAdd').addEventListener('click', () => {
         // Suggest next sequential number
         const nums = Array.from($('rosterList').querySelectorAll('input.num'))
-          .map((i) => parseInt(i.value, 10))
-          .filter((n) => !isNaN(n));
+          .map((i) => Number.parseInt(i.value, 10))
+          .filter((n) => !Number.isNaN(n));
         const next = nums.length ? Math.max(...nums) + 1 : 1;
         addRosterRow(next, '');
       });
@@ -1914,9 +1926,9 @@
         const seenNums = new Set();
         let skipped = 0;
         for (const row of rows) {
-          const num = parseInt(row.querySelector('.num').value, 10);
+          const num = Number.parseInt(row.querySelector('.num').value, 10);
           const name = row.querySelector('.nm').value.trim();
-          if (isNaN(num) || num < 1) {
+          if (Number.isNaN(num) || num < 1) {
             skipped++;
             continue;
           }
@@ -1941,27 +1953,35 @@
 
       // CSV import for roster
       // Parses one CSV line, handling quoted fields with embedded commas and "" escapes.
+      function csvQuotedStep(c, next) {
+        if (c !== '"') return { append: c, advance: 1, exitQuote: false };
+        if (next === '"') return { append: '"', advance: 2, exitQuote: false };
+        return { append: '', advance: 1, exitQuote: true };
+      }
+
       function parseCSVLine(line) {
         const out = [];
         let cur = '';
         let inQ = false;
-        for (let i = 0; i < line.length; i++) {
+        let i = 0;
+        while (i < line.length) {
           const c = line[i];
           if (inQ) {
-            if (c === '"') {
-              if (line[i + 1] === '"') {
-                cur += '"';
-                i++;
-              } else {
-                inQ = false;
-              }
-            } else cur += c;
+            const s = csvQuotedStep(c, line[i + 1]);
+            cur += s.append;
+            if (s.exitQuote) inQ = false;
+            i += s.advance;
           } else if (c === ',') {
             out.push(cur);
             cur = '';
+            i++;
           } else if (c === '"' && cur === '') {
             inQ = true;
-          } else cur += c;
+            i++;
+          } else {
+            cur += c;
+            i++;
+          }
         }
         out.push(cur);
         return out;
@@ -1981,8 +2001,8 @@
             const parts = parseCSVLine(line);
             // Skip a header row whose first column is non-numeric (e.g. "Number,Name").
             if (idx === 0 && /[a-zA-Z]/.test(parts[0] || '')) return;
-            const num = parseInt(parts[0], 10);
-            if (isNaN(num)) return;
+            const num = Number.parseInt(parts[0], 10);
+            if (Number.isNaN(num)) return;
             addRosterRow(num, (parts[1] || '').trim());
             added++;
           });
@@ -2208,7 +2228,7 @@
         a.download = filename;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
+        a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 100);
       }
 
@@ -2303,8 +2323,8 @@
           // Warn if this stop has events attached. Removing the stop is a soft-delete:
           // the events stay in the log, just hidden until the stop is re-added with the
           // same id. That keeps roster history intact across operator coordination errors.
-          const idVal = parseInt(row.querySelector('.stop-id').value, 10);
-          if (!isNaN(idVal)) {
+          const idVal = Number.parseInt(row.querySelector('.stop-id').value, 10);
+          if (!Number.isNaN(idVal)) {
             const eventCount = state.events.filter((e) => e.stop === idVal).length;
             if (eventCount > 0) {
               const ok = confirm(
@@ -2334,9 +2354,9 @@
         const newStops = [];
         const seen = new Set();
         for (const row of document.querySelectorAll('#stopsList .stop-row')) {
-          const id = parseInt(row.querySelector('.stop-id').value, 10);
+          const id = Number.parseInt(row.querySelector('.stop-id').value, 10);
           const name = row.querySelector('.stop-name').value.trim();
-          if (isNaN(id) || id < 1 || id > 99) continue;
+          if (Number.isNaN(id) || id < 1 || id > 99) continue;
           if (seen.has(id)) {
             toast(`Duplicate stop id ${id}`);
             return;
@@ -2352,12 +2372,12 @@
         state.stops = newStops;
 
         // myStop must reference a stop that still exists; clamp if it doesn't.
-        const myStop = parseInt($('myStopSelect').value, 10);
+        const myStop = Number.parseInt($('myStopSelect').value, 10);
         state.myStop = newStops.some((s) => s.id === myStop) ? myStop : newStops[0].id;
 
         // myDevice 1..99 (advanced).
-        const dev = parseInt($('myDeviceInput').value, 10);
-        if (!isNaN(dev) && dev >= 1 && dev <= 99) {
+        const dev = Number.parseInt($('myDeviceInput').value, 10);
+        if (!Number.isNaN(dev) && dev >= 1 && dev <= 99) {
           state.myDevice = dev;
         }
 
@@ -2407,7 +2427,7 @@
         // Suggest the lowest unused id 1..99 in the current editor.
         const used = new Set(
           Array.from(document.querySelectorAll('#stopsList .stop-id')).map((i) =>
-            parseInt(i.value, 10)
+            Number.parseInt(i.value, 10)
           )
         );
         let next = 1;
@@ -2480,8 +2500,8 @@
         const peers = $('radioPeers');
         peers.innerHTML = '';
         const peerIds = Object.keys(state.peers)
-          .map((k) => parseInt(k, 10))
-          .filter((k) => !isNaN(k) && k !== state.myDevice)
+          .map((k) => Number.parseInt(k, 10))
+          .filter((k) => !Number.isNaN(k) && k !== state.myDevice)
           .sort((a, b) => a - b);
         if (peerIds.length === 0) {
           peers.innerHTML =
@@ -2683,37 +2703,36 @@
         }
       }
 
+      function bridgeStatusDisplay() {
+        if (bridge.connectionState === 'open' && bridge.kissConnected) {
+          return { cls: 'radio-bridge ok', meta: 'bridge online · radio link up' };
+        }
+        if (bridge.connectionState === 'open') {
+          let meta = 'bridge online · radio link DOWN';
+          if (bridge.lastError) meta += ` (${bridge.lastError})`;
+          return { cls: 'radio-bridge warn', meta };
+        }
+        if (bridge.connectionState === 'connecting') {
+          return { cls: 'radio-bridge', meta: 'bridge connecting…' };
+        }
+        if (bridge.connectionState === 'error') {
+          return { cls: 'radio-bridge err', meta: 'bridge stream error — retrying' };
+        }
+        return { cls: 'radio-bridge', meta: 'bridge idle' };
+      }
+
       function refreshBridgeUi() {
         const el = $('radioBridgeStatus');
-        if (!bridge.detected) {
-          el.style.display = 'none';
-        } else {
+        if (bridge.detected) {
           el.style.display = '';
-          let cls = 'radio-bridge';
-          let meta;
-          if (bridge.connectionState === 'open' && bridge.kissConnected) {
-            cls += ' ok';
-            meta = 'bridge online · radio link up';
-          } else if (bridge.connectionState === 'open' && !bridge.kissConnected) {
-            cls += ' warn';
-            meta = 'bridge online · radio link DOWN';
-            if (bridge.lastError) meta += ` (${bridge.lastError})`;
-          } else if (bridge.connectionState === 'connecting') {
-            meta = 'bridge connecting…';
-          } else if (bridge.connectionState === 'error') {
-            cls += ' err';
-            meta = 'bridge stream error — retrying';
-          } else {
-            meta = 'bridge idle';
-          }
+          const { cls, meta } = bridgeStatusDisplay();
           el.className = cls;
           $('radioBridgeStation').textContent = bridge.station || 'Bridge';
           $('radioBridgeMeta').textContent = meta;
+        } else {
+          el.style.display = 'none';
         }
-        // Send-via-radio button visibility
-        const sendBtn = $('radioSendViaRadio');
-        sendBtn.style.display = bridge.detected ? '' : 'none';
-        // Bridge inbox
+        $('radioSendViaRadio').style.display = bridge.detected ? '' : 'none';
         const inbox = $('radioBridgeInbox');
         if (bridge.buffer.length > 0) {
           inbox.classList.add('has-frames');

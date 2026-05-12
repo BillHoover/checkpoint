@@ -33,7 +33,7 @@ function doPost(e) {
     const body = JSON.parse(e.postData.contents);
 
     // Test pings from the Settings dialog
-    if (body && body.test === true) {
+    if (body?.test === true) {
       return jsonResponse({ ok: true, test: true });
     }
 

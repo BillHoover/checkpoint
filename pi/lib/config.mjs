@@ -35,71 +35,76 @@ export function load(filePath) {
   return validate(cfg, path.dirname(abs));
 }
 
-function validate(cfg, baseDir) {
-  if (!cfg || typeof cfg !== 'object') fail('top level must be an object');
-
-  // station
-  if (!cfg.station) fail('missing "station"');
-  const sc = String(cfg.station.callsign || '').toUpperCase();
+function validateStation(s) {
+  if (!s) fail('missing "station"');
+  const sc = String(s.callsign || '').toUpperCase();
   if (!CALLSIGN_RE.test(sc))
-    fail(
-      `station.callsign must match ${CALLSIGN_RE} (got ${JSON.stringify(cfg.station.callsign)})`
-    );
-  const ssid = Number(cfg.station.ssid);
+    fail(`station.callsign must match ${CALLSIGN_RE} (got ${JSON.stringify(s.callsign)})`);
+  const ssid = Number(s.ssid);
   if (!Number.isInteger(ssid) || ssid < 0 || ssid > 15)
     fail('station.ssid must be an integer 0..15');
-  cfg.station = { callsign: sc, ssid };
+  return { callsign: sc, ssid };
+}
 
-  // aprs
-  if (!cfg.aprs) fail('missing "aprs"');
-  const dest = String(cfg.aprs.destination || '').toUpperCase();
+function validateAprs(a) {
+  if (!a) fail('missing "aprs"');
+  const dest = String(a.destination || '').toUpperCase();
   if (!CALLSIGN_RE.test(dest)) fail(`aprs.destination must match ${CALLSIGN_RE}`);
-  const destSsid = Number(cfg.aprs.destinationSsid ?? 0);
+  const destSsid = Number(a.destinationSsid ?? 0);
   if (!Number.isInteger(destSsid) || destSsid < 0 || destSsid > 15)
     fail('aprs.destinationSsid must be 0..15');
-  const digipath = Array.isArray(cfg.aprs.digipath) ? cfg.aprs.digipath.map(String) : [];
+  const digipath = Array.isArray(a.digipath) ? a.digipath.map(String) : [];
   for (const hop of digipath) {
     if (!/^[A-Z0-9]{1,6}(-(1[0-5]|[0-9]))?$/.test(hop))
       fail(`aprs.digipath entry ${JSON.stringify(hop)} is not a valid AX.25 callsign[-ssid]`);
   }
-  const addressee = String(cfg.aprs.addressee || 'CKPT').toUpperCase();
+  const addressee = String(a.addressee || 'CKPT').toUpperCase();
   if (!/^[A-Z0-9 ]{1,9}$/.test(addressee))
     fail('aprs.addressee must be 1..9 chars from A-Z 0-9 space');
-  cfg.aprs = { destination: dest, destinationSsid: destSsid, digipath, addressee };
+  return { destination: dest, destinationSsid: destSsid, digipath, addressee };
+}
 
-  // https
-  if (!cfg.https) fail('missing "https"');
-  requireType(cfg.https, 'host', 'string', 'https');
-  const port = Number(cfg.https.port);
+function validateHttps(h, baseDir) {
+  if (!h) fail('missing "https"');
+  requireType(h, 'host', 'string', 'https');
+  const port = Number(h.port);
   if (!Number.isInteger(port) || port < 1 || port > 65535) fail('https.port must be 1..65535');
-  cfg.https.port = port;
-  requireType(cfg.https, 'certFile', 'string', 'https');
-  requireType(cfg.https, 'keyFile', 'string', 'https');
-  cfg.https.certFile = path.resolve(baseDir, cfg.https.certFile);
-  cfg.https.keyFile = path.resolve(baseDir, cfg.https.keyFile);
-  for (const f of [cfg.https.certFile, cfg.https.keyFile]) {
+  requireType(h, 'certFile', 'string', 'https');
+  requireType(h, 'keyFile', 'string', 'https');
+  const certFile = path.resolve(baseDir, h.certFile);
+  const keyFile = path.resolve(baseDir, h.keyFile);
+  for (const f of [certFile, keyFile]) {
     if (!fs.existsSync(f)) fail(`cert file not found: ${f}`);
   }
+  return { ...h, port, certFile, keyFile };
+}
 
-  // static
-  if (!cfg.static) fail('missing "static"');
-  requireType(cfg.static, 'root', 'string', 'static');
-  cfg.static.root = path.resolve(baseDir, cfg.static.root);
-  if (!fs.existsSync(path.join(cfg.static.root, 'index.html'))) {
-    fail(`static.root (${cfg.static.root}) does not contain index.html`);
+function validateStatic(s, baseDir) {
+  if (!s) fail('missing "static"');
+  requireType(s, 'root', 'string', 'static');
+  const root = path.resolve(baseDir, s.root);
+  if (!fs.existsSync(path.join(root, 'index.html'))) {
+    fail(`static.root (${root}) does not contain index.html`);
   }
+  return { ...s, root };
+}
 
-  // kiss
-  if (!cfg.kiss) fail('missing "kiss"');
-  requireType(cfg.kiss, 'host', 'string', 'kiss');
-  const kport = Number(cfg.kiss.port);
-  if (!Number.isInteger(kport) || kport < 1 || kport > 65535) fail('kiss.port must be 1..65535');
-  cfg.kiss.port = kport;
-  cfg.kiss.reconnectMs = Math.max(500, Number(cfg.kiss.reconnectMs ?? 3000));
+function validateKiss(k) {
+  if (!k) fail('missing "kiss"');
+  requireType(k, 'host', 'string', 'kiss');
+  const port = Number(k.port);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) fail('kiss.port must be 1..65535');
+  return { ...k, port, reconnectMs: Math.max(500, Number(k.reconnectMs ?? 3000)) };
+}
 
-  // log (optional)
+function validate(cfg, baseDir) {
+  if (!cfg || typeof cfg !== 'object') fail('top level must be an object');
+  cfg.station = validateStation(cfg.station);
+  cfg.aprs = validateAprs(cfg.aprs);
+  cfg.https = validateHttps(cfg.https, baseDir);
+  cfg.static = validateStatic(cfg.static, baseDir);
+  cfg.kiss = validateKiss(cfg.kiss);
   cfg.log = cfg.log && typeof cfg.log === 'object' ? cfg.log : {};
   cfg.log.level = cfg.log.level || 'info';
-
   return cfg;
 }

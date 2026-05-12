@@ -61,8 +61,9 @@ const server = https.createServer(
       return res.end('bad request');
     }
     if (pathname.endsWith('/')) pathname += 'index.html';
-    const filePath = path.join(ROOT, pathname);
-    if (!filePath.startsWith(ROOT)) {
+    const filePath = path.resolve(ROOT, '.' + pathname);
+    const rel = path.relative(ROOT, filePath);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       res.statusCode = 403;
       return res.end('forbidden');
     }

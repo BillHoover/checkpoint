@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 — 2026-05-12 — SonarCloud sweep
+
+- **Security**: path-traversal hardening on the two static-file servers (`pi/server.mjs`, `tools/serve.mjs`) — `path.resolve` + `path.relative` containment check rather than `startsWith` (closes Sonar S2083 BLOCKER on both).
+- **Maintainability**: extracted helpers in `pi/lib/config.mjs` (per-section validators) and `index.html` (`parseEventToken`, `decodeFrame`, `applyInbound`, `composeFrames`, `refreshBridgeUi`, `parseCSVLine`) — same behavior, each function now under Sonar's cognitive-complexity threshold.
+- **Modernization sweep across `index.html`**: `parseInt` → `Number.parseInt`, `isNaN` → `Number.isNaN`, `[^0-9]` → `\D`, `parentNode.removeChild` → `Element.remove`, nested ternaries flattened, optional chain in `apps-script.js`.
+- **A11y**: standalone `<label>` tags that didn't reference a control are now `<div class="section-label">`, with one regained `for=` on the radio-outbound textarea.
+- Service worker cache bumped to `checkpoint-v6`.
+
 ## 0.4.0 — 2026-05-10 — Pi radio bridge (Phase 3b groundwork)
 
 - New **`pi/`** subdirectory: a Node service (zero runtime deps) that runs on a per-checkpoint Raspberry Pi (or any Linux/macOS/Windows host) and acts as a radio I/O appliance. It serves the existing PWA over HTTPS from the Pi and shuttles `CKPT/1` frames over RF via Direwolf's KISS-over-TCP interface, so volunteers no longer have to read frames over voice or copy-paste them into a separate radio app.
